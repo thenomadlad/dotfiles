@@ -1,0 +1,11 @@
+[font]
+size = 13
+normal = { family = "NotoMono Nerd Font Mono", style = "Regular" }
+
+[window]
+dynamic_padding = true
+padding = { x = 7, y = 7 }
+decorations = "Full"
+opacity = 0.8
+blur = true
+decorations_theme_variant = "Dark"
