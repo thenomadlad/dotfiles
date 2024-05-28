@@ -9,5 +9,5 @@ eval "$(pyenv init --path)"
 
 
 # Added by Toolbox App
-export PATH="$PATH:/Users/aditya/Library/Application Support/JetBrains/Toolbox/scripts"
+export PATH="$PATH:$HOME/Library/Application Support/JetBrains/Toolbox/scripts"
 

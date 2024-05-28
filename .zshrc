@@ -64,7 +64,8 @@ export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 
 # gcloud
-source "/opt/homebrew/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/path.zsh.inc"
+source "$(brew --prefix)/share/google-cloud-sdk/path.zsh.inc"
+source "$(brew --prefix)/share/google-cloud-sdk/completion.zsh.inc"
 
 # Set personal aliases, overriding those provided by oh-my-zsh libs,
 # plugins, and themes. Aliases can be placed here, though oh-my-zsh
@@ -76,7 +77,7 @@ source "/opt/homebrew/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/path.zsh
 # alias ohmyzsh="mate ~/.oh-my-zsh"
 alias ls='ls --color'
 
-export PATH="/Users/aditya/.vscode-dotnet-sdk/.dotnet:$HOME/.emacs.d/bin:$PATH"
+export PATH="$HOME/.vscode-dotnet-sdk/.dotnet:$HOME/.emacs.d/bin:$PATH"
 
 eval "$(pyenv virtualenv-init -)"
 
