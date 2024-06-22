@@ -43,7 +43,9 @@ autoload -U compinit && compinit
 zinit cdreplay -q
 
 # Homebrew completions
-FPATH="$(brew --prefix)/share/zsh/site-functions:${FPATH}"
+if [[ -f "/opt/homebrew/bin/brew" ]] then
+  FPATH="$(brew --prefix)/share/zsh/site-functions:${FPATH}"
+fi
 
 # Git autofetch interval - 20 mins
 GIT_AUTO_FETCH_INTERVAL=1200  # seconds
@@ -64,8 +66,10 @@ export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 
 # gcloud
-source "$(brew --prefix)/share/google-cloud-sdk/path.zsh.inc"
-source "$(brew --prefix)/share/google-cloud-sdk/completion.zsh.inc"
+if [[ -f "/opt/homebrew/bin/brew" ]] then
+  source "$(brew --prefix)/share/google-cloud-sdk/path.zsh.inc"
+  source "$(brew --prefix)/share/google-cloud-sdk/completion.zsh.inc"
+fi
 
 # Set personal aliases, overriding those provided by oh-my-zsh libs,
 # plugins, and themes. Aliases can be placed here, though oh-my-zsh
@@ -76,10 +80,13 @@ source "$(brew --prefix)/share/google-cloud-sdk/completion.zsh.inc"
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
 alias ls='ls --color'
+alias du=dust
 
 export PATH="$HOME/.vscode-dotnet-sdk/.dotnet:$HOME/.emacs.d/bin:$PATH"
 
-eval "$(pyenv virtualenv-init -)"
+if [ -x "$(command -v pyenv)" ]; then
+  eval "$(pyenv virtualenv-init -)"
+fi
 
 #THIS MUST BE AT THE END OF THE FILE FOR SDKMAN TO WORK!!!
 export SDKMAN_DIR="$HOME/.sdkman"
