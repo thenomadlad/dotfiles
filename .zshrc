@@ -22,6 +22,9 @@ fi
 # Source/load zinit
 source "${ZINIT_HOME}/zinit.zsh"
 
+# profile comes here
+source "${HOME}/.profile"
+
 # Plugins
 zinit ice depth=1; zinit light romkatv/powerlevel10k
 zinit light zsh-users/zsh-completions
@@ -34,8 +37,8 @@ zinit snippet OMZP::git
 zinit snippet OMZP::sudo
 zinit snippet OMZP::command-not-found
 
-eval "$(fzf --zsh)"
-eval "$(zoxide init --cmd cd zsh)"
+[ -x "$(command -v fzf)" ] && eval "$(fzf --zsh)"
+[ -x "$(command -v zoxide)" ] && eval "$(zoxide init --cmd cd zsh)"
 
 # load completions
 autoload -U compinit && compinit
@@ -44,17 +47,17 @@ zinit cdreplay -q
 
 # Homebrew completions
 if [[ -f "/opt/homebrew/bin/brew" ]] then
-  FPATH="$(brew --prefix)/share/zsh/site-functions:${FPATH}"
+  export FPATH="$(brew --prefix)/share/zsh/site-functions:${FPATH}"
 fi
 
 # Git autofetch interval - 20 mins
-GIT_AUTO_FETCH_INTERVAL=1200  # seconds
+export GIT_AUTO_FETCH_INTERVAL=1200  # seconds
 
 export MANPATH="/usr/local/man:$MANPATH"
 
 # Preferred editor for local and remote sessions
 if [[ -n $SSH_CONNECTION ]]; then
-  export EDITOR='vi'
+  export EDITOR='nvim'
 else
   export EDITOR='nvim'
   export VISUAL="$EDITOR"
@@ -71,6 +74,10 @@ if [[ -f "/opt/homebrew/bin/brew" ]] then
   source "$(brew --prefix)/share/google-cloud-sdk/completion.zsh.inc"
 fi
 
+if [[ -f "/etc/profile.d/google-cloud-cli.sh" ]]; then
+  source "/etc/profile.d/google-cloud-cli.sh"
+fi
+
 # Set personal aliases, overriding those provided by oh-my-zsh libs,
 # plugins, and themes. Aliases can be placed here, though oh-my-zsh
 # users are encouraged to define aliases within the ZSH_CUSTOM folder.
@@ -82,9 +89,10 @@ fi
 alias ls='ls --color'
 alias du=dust
 
-export PATH="$HOME/.vscode-dotnet-sdk/.dotnet:$HOME/.emacs.d/bin:$PATH"
+export PATH="$HOME/.vscode-dotnet-sdk/.dotnet:$HOME/.emacs.d/bin:$PATH:$HOME/.ghcup/bin:$PATH"
 
 if [ -x "$(command -v pyenv)" ]; then
+  eval "$(pyenv init -)"
   eval "$(pyenv virtualenv-init -)"
 fi
 
