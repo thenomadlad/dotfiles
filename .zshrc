@@ -1,15 +1,3 @@
-# Enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
-# Initialization code that may require console input (password prompts, [y/n]
-# confirmations, etc.) must go above this block; everything else may go below.
-if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
-  source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
-fi
-
-if [[ -f "/opt/homebrew/bin/brew" ]] then
-  # If you're using macOS, you'll want this enabled
-  eval "$(/opt/homebrew/bin/brew shellenv)"
-fi
-
 # If you come from bash you might have to change your $PATH.
 # export PATH=$HOME/bin:/usr/local/bin:$PATH
 ZINIT_HOME="${HOME}/.local/share/zinit/zinit.git"
@@ -23,27 +11,43 @@ fi
 source "${ZINIT_HOME}/zinit.zsh"
 
 # Plugins
-zinit ice depth=1; zinit light romkatv/powerlevel10k
 zinit light zsh-users/zsh-completions
-zinit light zsh-users/zsh-autosuggestions
 zinit light zsh-users/zsh-syntax-highlighting
 zinit light softmoth/zsh-vim-mode
-zinit light Aloxaf/fzf-tab
 
 zinit snippet OMZP::git
 zinit snippet OMZP::sudo
 zinit snippet OMZP::command-not-found
 
-eval "$(fzf --zsh)"
-eval "$(zoxide init --cmd cd zsh)"
-
 # load completions
 autoload -U compinit && compinit
 
-zinit cdreplay -q
+# homebrew on mac
+if [[ -f "/opt/homebrew/bin/brew" ]] then
+  eval "$(/opt/homebrew/bin/brew shellenv)"
 
-# Homebrew completions
-FPATH="$(brew --prefix)/share/zsh/site-functions:${FPATH}"
+  FPATH="$(brew --prefix)/share/zsh/site-functions:${FPATH}"
+
+  # gcloud
+  source "$(brew --prefix)/share/google-cloud-sdk/path.zsh.inc"
+  source "$(brew --prefix)/share/google-cloud-sdk/completion.zsh.inc"
+fi
+
+if [[ -x "$(which zoxide)" ]]; then
+  eval "$(zoxide init --cmd cd zsh)"
+fi
+
+# fzf and shell integration with it
+if [[ -x "$(which fzf)" ]]; then
+  zinit light Aloxaf/fzf-tab
+  eval "$(fzf --zsh)"
+fi
+
+# this needs to be loaded after fzf
+zinit light zsh-users/zsh-autosuggestions
+
+# replay compdefs
+zinit cdreplay -q
 
 # Git autofetch interval - 20 mins
 GIT_AUTO_FETCH_INTERVAL=1200  # seconds
@@ -63,10 +67,6 @@ export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 
-# gcloud
-source "$(brew --prefix)/share/google-cloud-sdk/path.zsh.inc"
-source "$(brew --prefix)/share/google-cloud-sdk/completion.zsh.inc"
-
 # Set personal aliases, overriding those provided by oh-my-zsh libs,
 # plugins, and themes. Aliases can be placed here, though oh-my-zsh
 # users are encouraged to define aliases within the ZSH_CUSTOM folder.
@@ -77,16 +77,19 @@ source "$(brew --prefix)/share/google-cloud-sdk/completion.zsh.inc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
 alias ls='ls --color'
 
-export PATH="$HOME/.vscode-dotnet-sdk/.dotnet:$HOME/.emacs.d/bin:$PATH"
+export SUPERBENCH_IP="10.0.0.191"
+alias superbench="ssh aditya@$SUPERBENCH_IP"
 
-eval "$(pyenv virtualenv-init -)"
+if [[ -x "$(which pyenv)" ]]; then
+  export PATH="$HOME/.vscode-dotnet-sdk/.dotnet:$HOME/.emacs.d/bin:$PATH"
+
+  eval "$(pyenv init -)"
+  eval "$(pyenv virtualenv-init -)"
+fi
 
 #THIS MUST BE AT THE END OF THE FILE FOR SDKMAN TO WORK!!!
 export SDKMAN_DIR="$HOME/.sdkman"
 [[ -s "$HOME/.sdkman/bin/sdkman-init.sh" ]] && source "$HOME/.sdkman/bin/sdkman-init.sh"
-
-# To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
-[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
 
 # Keybindings
 bindkey -v
@@ -114,3 +117,7 @@ zstyle ':completion:*' menu no
 zstyle ':fzf-tab:complete:cd:*' fzf-preview 'ls --color $realpath'
 zstyle ':fzf-tab:complete:__zoxide_z:*' fzf-preview 'ls --color $realpath'
 
+## Finally let's set up starship
+if [[ -x $(which starship) ]]; then
+  eval "$(starship init zsh)"
+fi
