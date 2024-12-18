@@ -10,6 +10,9 @@ fi
 # Source/load zinit
 source "${ZINIT_HOME}/zinit.zsh"
 
+# profile comes here
+source "${HOME}/.profile"
+
 # Plugins
 zinit light zsh-users/zsh-completions
 zinit light zsh-users/zsh-syntax-highlighting
@@ -33,39 +36,42 @@ if [[ -f "/opt/homebrew/bin/brew" ]] then
   source "$(brew --prefix)/share/google-cloud-sdk/completion.zsh.inc"
 fi
 
-if [[ -x "$(which zoxide)" ]]; then
-  eval "$(zoxide init --cmd cd zsh)"
-fi
-
-# fzf and shell integration with it
-if [[ -x "$(which fzf)" ]]; then
-  zinit light Aloxaf/fzf-tab
-  eval "$(fzf --zsh)"
-fi
+[ -x "$(command -v fzf)" ] && eval "$(fzf --zsh)"
+[ -x "$(command -v zoxide)" ] && eval "$(zoxide init --cmd cd zsh)"
 
 # this needs to be loaded after fzf
 zinit light zsh-users/zsh-autosuggestions
 
-# replay compdefs
-zinit cdreplay -q
-
 # Git autofetch interval - 20 mins
-GIT_AUTO_FETCH_INTERVAL=1200  # seconds
+export GIT_AUTO_FETCH_INTERVAL=1200  # seconds
 
 export MANPATH="/usr/local/man:$MANPATH"
 
 # Preferred editor for local and remote sessions
 if [[ -n $SSH_CONNECTION ]]; then
-  export EDITOR='vi'
+  export EDITOR='nvim'
 else
   export EDITOR='nvim'
   export VISUAL="$EDITOR"
 fi
 
 # NVM
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+if [[ -s "$NVM_DIR/nvm.sh" ]]; then
+  unset npm_config_prefix
+  export NVM_DIR="$HOME/.nvm"
+  [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+  [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+fi
+
+# gcloud
+if [[ -f "/opt/homebrew/bin/brew" ]] then
+  source "$(brew --prefix)/share/google-cloud-sdk/path.zsh.inc"
+  source "$(brew --prefix)/share/google-cloud-sdk/completion.zsh.inc"
+fi
+
+if [[ -f "/etc/profile.d/google-cloud-cli.sh" ]]; then
+  source "/etc/profile.d/google-cloud-cli.sh"
+fi
 
 # Set personal aliases, overriding those provided by oh-my-zsh libs,
 # plugins, and themes. Aliases can be placed here, though oh-my-zsh
@@ -76,13 +82,12 @@ export NVM_DIR="$HOME/.nvm"
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
 alias ls='ls --color'
+alias du=dust
 
 export SUPERBENCH_IP="10.0.0.191"
 alias superbench="ssh aditya@$SUPERBENCH_IP"
 
-if [[ -x "$(which pyenv)" ]]; then
-  export PATH="$HOME/.vscode-dotnet-sdk/.dotnet:$HOME/.emacs.d/bin:$PATH"
-
+if [ -x "$(command -v pyenv)" ]; then
   eval "$(pyenv init -)"
   eval "$(pyenv virtualenv-init -)"
 fi
@@ -90,6 +95,9 @@ fi
 #THIS MUST BE AT THE END OF THE FILE FOR SDKMAN TO WORK!!!
 export SDKMAN_DIR="$HOME/.sdkman"
 [[ -s "$HOME/.sdkman/bin/sdkman-init.sh" ]] && source "$HOME/.sdkman/bin/sdkman-init.sh"
+
+# replay compdefs
+zinit cdreplay -q
 
 # Keybindings
 bindkey -v
