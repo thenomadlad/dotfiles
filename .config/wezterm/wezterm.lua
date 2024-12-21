@@ -1,13 +1,6 @@
--- Pull in the wezterm API
-local wezterm = require 'wezterm'
+local config = require("wezterm").config_builder()
 
--- This will hold the configuration.
-local config = wezterm.config_builder()
+require("ui")(config)
+require("navigator")(config)
 
-config.font_size = 13
-config.color_scheme = "Tokyo Night"
-
-config.tab_bar_at_bottom = true
-
--- and finally, return the configuration to wezterm
 return config
