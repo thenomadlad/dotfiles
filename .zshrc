@@ -34,6 +34,9 @@ if [[ -f "/opt/homebrew/bin/brew" ]] then
   # gcloud
   source "$(brew --prefix)/share/google-cloud-sdk/path.zsh.inc"
   source "$(brew --prefix)/share/google-cloud-sdk/completion.zsh.inc"
+
+  # piuthan
+  export PATH="/opt/homebrew/opt/python/libexec/bin:$PATH"
 fi
 
 [ -x "$(command -v fzf)" ] && eval "$(fzf --zsh)"
@@ -56,9 +59,9 @@ else
 fi
 
 # NVM
+export NVM_DIR="$HOME/.nvm"
 if [[ -s "$NVM_DIR/nvm.sh" ]]; then
   unset npm_config_prefix
-  export NVM_DIR="$HOME/.nvm"
   [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
   [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 fi
@@ -83,9 +86,6 @@ fi
 # alias ohmyzsh="mate ~/.oh-my-zsh"
 alias ls='ls --color'
 alias du=dust
-
-export SUPERBENCH_IP="10.0.0.191"
-alias superbench="ssh aditya@$SUPERBENCH_IP"
 
 if [ -x "$(command -v pyenv)" ]; then
   eval "$(pyenv init -)"
