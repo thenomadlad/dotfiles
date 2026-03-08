@@ -1,0 +1,8 @@
+# rocks.toml
+[plugins."fugit2.nvim"]
+install_args = [
+  "GIT2_DIR=/opt/homebrew"
+]
+
+[plugins."fugit2.nvim".config]
+libgit2_path = "/opt/homebrew/lib/libgit2.dylib"
