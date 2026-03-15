@@ -78,7 +78,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.config/claude/hooks/git-repo-check.py"
+            "command": "~/.claude/hooks/git-repo-check.py"
           }
         ]
       }
