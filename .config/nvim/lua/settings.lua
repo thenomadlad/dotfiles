@@ -8,6 +8,7 @@ vim.opt.clipboard = "unnamedplus"
 vim.bo.softtabstop = 2
 
 vim.keymap.set("i", "jk", "<ESC>", { silent = true })
+vim.keymap.set("n", "<leader>c", ":bd<CR>", { silent = true })
 
 -- numbering
 vim.opt.cursorline = true

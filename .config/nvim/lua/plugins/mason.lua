@@ -21,6 +21,8 @@ return {
         'rust_analyzer',
         'pylsp',
         'ts_ls',
+        'astro',
+        'tailwindcss'
       },
       automatic_enable = {
         exclude = {
@@ -33,6 +35,9 @@ return {
     require('mason-null-ls').setup({
       handlers = {}
     })
+
+    vim.lsp.enable('astro')
+    vim.lsp.enable('tailwindcss')
 
     vim.lsp.config("lua_ls", {
       on_init = function(client)
