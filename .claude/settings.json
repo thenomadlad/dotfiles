@@ -79,9 +79,11 @@
     "command": "~/.claude/statusline.sh"
   },
   "enabledPlugins": {
-    "agent-browser@agent-browser": true
+    "agent-browser@agent-browser": true,
+    "rust-analyzer-lsp@claude-plugins-official": true
   },
   "alwaysThinkingEnabled": true,
   "effortLevel": "high",
+  "voiceEnabled": true,
   "skipDangerousModePermissionPrompt": true
 }

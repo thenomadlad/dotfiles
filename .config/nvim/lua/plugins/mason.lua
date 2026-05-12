@@ -22,7 +22,8 @@ return {
         'pylsp',
         'ts_ls',
         'astro',
-        'tailwindcss'
+        'tailwindcss',
+        'just',
       },
       automatic_enable = {
         exclude = {
@@ -38,6 +39,7 @@ return {
 
     vim.lsp.enable('astro')
     vim.lsp.enable('tailwindcss')
+    vim.lsp.enable('just')
 
     vim.lsp.config("lua_ls", {
       on_init = function(client)

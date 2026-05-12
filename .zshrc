@@ -31,6 +31,8 @@ if [[ -f "/opt/homebrew/bin/brew" ]] then
 
   FPATH="$(brew --prefix)/share/zsh/site-functions:${FPATH}"
 
+  export PATH="/opt/homebrew/opt/bison/bin:$PATH"
+
   # gcloud
   source "$(brew --prefix)/share/google-cloud-sdk/path.zsh.inc"
   source "$(brew --prefix)/share/google-cloud-sdk/completion.zsh.inc"
@@ -67,11 +69,6 @@ if [[ -s "$NVM_DIR/nvm.sh" ]]; then
 fi
 
 # gcloud
-if [[ -f "/opt/homebrew/bin/brew" ]] then
-  source "$(brew --prefix)/share/google-cloud-sdk/path.zsh.inc"
-  source "$(brew --prefix)/share/google-cloud-sdk/completion.zsh.inc"
-fi
-
 if [[ -f "/etc/profile.d/google-cloud-cli.sh" ]]; then
   source "/etc/profile.d/google-cloud-cli.sh"
 fi
@@ -86,6 +83,7 @@ fi
 # alias ohmyzsh="mate ~/.oh-my-zsh"
 alias ls='ls --color'
 alias du=dust
+alias superbench='wezterm ssh aditya@$(tailscale ip --6 superbench)'
 
 if [ -x "$(command -v pyenv)" ]; then
   eval "$(pyenv init -)"
@@ -127,5 +125,6 @@ zstyle ':fzf-tab:complete:__zoxide_z:*' fzf-preview 'ls --color $realpath'
 
 ## Finally let's set up starship
 if [[ -x $(which starship) ]]; then
+  export STARSHIP_LOG=error
   eval "$(starship init zsh)"
 fi
