@@ -1,22 +1,13 @@
 return {
-  "yousefhadder/markdown-plus.nvim",
-  ft = "markdown",
+  'MeanderingProgrammer/render-markdown.nvim',
+  ft = { 'markdown', 'quarto' },
+  dependencies = { 'nvim-treesitter/nvim-treesitter', 'nvim-mini/mini.nvim' },
   opts = function()
-    require("markdown-plus").setup({
-      features = {
-        table = true
-      },
-      table = {
-        enabled = true,
-        auto_format = true,
-        default_alignment = "left",
-        confirm_destructive = true,
-        keymaps = {
-          enabled = true,
-          prefix = "<leader>mt",
-          insert_mode_navigation = true,
-        },
-      },
+    require('render-markdown').setup({
+        completions = { lsp = { enabled = true } },
+        render_modes = true,
     })
+
+    require('render-markdown').enable()
   end
 }
