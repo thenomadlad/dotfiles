@@ -1,0 +1,2 @@
+return { "sitiom/nvim-numbertoggle" }
+
