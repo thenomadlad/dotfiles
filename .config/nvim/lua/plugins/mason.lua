@@ -8,6 +8,7 @@ return {
     'igorlfs/nvim-dap-view',
     'jay-babu/mason-nvim-dap.nvim',
     'nvimtools/none-ls.nvim',
+    'nvim-java/nvim-java',
     {
       'jay-babu/mason-null-ls.nvim',
       event = { 'BufReadPre', 'BufNewFile' },
@@ -57,11 +58,12 @@ return {
               globals = { "vim" },
             },
           })
-          client.notify("workspace/didChangeConfiguration", { settings = client.config.settings })
+          client:notify("workspace/didChangeConfiguration", { settings = client.config.settings })
         end
       end,
     })
 
+    -- python
     vim.lsp.config('pylsp', {
       settings = {
         pylsp = {
@@ -74,13 +76,21 @@ return {
       }
     })
 
+    -- java
+    require('java').setup()
+    vim.lsp.enable('jdtls')
+
     -- lsp action
+    local function jump_prev()
+      vim.diagnostic.jump({count = -1})
+    end;
+
     vim.keymap.set("n", "<leader>la", vim.lsp.buf.code_action, { desc="LSP code action" })
     vim.keymap.set("v", "<leader>la", vim.lsp.buf.code_action, { desc="LSP code action" })
     vim.keymap.set("n", "<leader>lr", vim.lsp.buf.rename, { desc="LSP rename symbol" })
     vim.keymap.set("n", "<leader>lgd", vim.lsp.buf.definition, { desc="LSP go to definition" })
-    vim.keymap.set("n", "<leader>ldn", vim.diagnostic.goto_next, { desc="LSP go to next issue" })
-    vim.keymap.set("n", "<leader>ldp", vim.diagnostic.goto_prev, { desc="LSP go to previous issue" })
+    vim.keymap.set("n", "<leader>ldn", vim.diagnostic.jump, { desc="LSP go to next issue" })
+    vim.keymap.set("n", "<leader>ldp", jump_prev, { desc="LSP go to previous issue" })
 
     -- lsp inlining
     vim.lsp.inlay_hint.enable()

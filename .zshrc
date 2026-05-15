@@ -42,7 +42,7 @@ if [[ -f "/opt/homebrew/bin/brew" ]] then
 fi
 
 [ -x "$(command -v fzf)" ] && eval "$(fzf --zsh)"
-[ -x "$(command -v zoxide)" ] && eval "$(zoxide init --cmd cd zsh)"
+[ -x "$(command -v zoxide)" ] && [[ $- == *i* ]] && eval "$(zoxide init --cmd cd zsh)"
 
 # this needs to be loaded after fzf
 zinit light zsh-users/zsh-autosuggestions

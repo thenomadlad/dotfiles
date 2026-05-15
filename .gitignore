@@ -97,4 +97,7 @@ Temporary Items
 .ropeproject
 
 # Claude excluded by default
-.claude/*
+!.claude
+
+# .config included by default
+!.config

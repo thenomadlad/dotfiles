@@ -6,6 +6,7 @@ vim.opt.shiftwidth = 2
 vim.opt.expandtab = true
 vim.opt.clipboard = "unnamedplus"
 vim.bo.softtabstop = 2
+vim.opt.fillchars = { eob = " " }
 
 vim.keymap.set("i", "jk", "<ESC>", { silent = true })
 vim.keymap.set("n", "<leader>c", ":bd<CR>", { silent = true })
