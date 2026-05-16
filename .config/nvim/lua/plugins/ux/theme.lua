@@ -1,6 +1,9 @@
 return {
   -- sensible defaults to UX
-  'stevearc/dressing.nvim',
+  {
+    'stevearc/dressing.nvim',
+    event = "VeryLazy"
+  },
 
   -- lua/plugins/rose-pine.lua
   {
@@ -47,8 +50,7 @@ return {
   -- diagnostic
   {
     'rachartier/tiny-inline-diagnostic.nvim',
-    event = 'VeryLazy', -- Or `LspAttach`
-    priority = 1000, -- needs to be loaded in first
+    event = 'LspAttach',
     config = function()
       -- disable default
       vim.diagnostic.config({

@@ -1,30 +1,24 @@
 return {
-  "nvim-telescope/telescope.nvim", version='0.1.x',
-  dependencies = {
-    "nvim-lua/plenary.nvim",
-  },
-  opts = function()
-    local builtin = require('telescope.builtin')
-
+  "nvim-telescope/telescope.nvim", version = '0.1.x',
+  dependencies = { "nvim-lua/plenary.nvim" },
+  keys = {
     -- finding things
-    vim.keymap.set('n', '<leader>ff', builtin.find_files, { desc = 'Telescope find files' })
-    vim.keymap.set('n', '<leader>fg', builtin.live_grep, { desc = 'Telescope live grep' })
-    vim.keymap.set({'v', 'n'}, '<leader>fw', builtin.grep_string, { desc = 'Telescope live grep' })
+    { "<leader>ff", function() require('telescope.builtin').find_files() end, desc = "Telescope find files" },
+    { "<leader>fg", function() require('telescope.builtin').live_grep() end, desc = "Telescope live grep" },
+    { "<leader>fw", function() require('telescope.builtin').grep_string() end, mode = { 'v', 'n' }, desc = "Telescope grep string" },
 
     -- vim things
-    vim.keymap.set('n', '<leader>fb', builtin.buffers, { desc = 'Telescope buffers' })
-    vim.keymap.set('n', '<leader>fh', builtin.help_tags, { desc = 'Telescope help tags' })
+    { "<leader>fb", function() require('telescope.builtin').buffers() end, desc = "Telescope buffers" },
+    { "<leader>fh", function() require('telescope.builtin').help_tags() end, desc = "Telescope help tags" },
 
     -- lsp things
-    vim.keymap.set({'v', 'n'}, '<leader>lci', builtin.lsp_incoming_calls, { desc = 'LSP find incoming calls' })
-    vim.keymap.set({'v', 'n'}, '<leader>lco', builtin.lsp_outgoing_calls, { desc = 'LSP find outgoing calls' })
-    vim.keymap.set({'v', 'n'}, '<leader>li', builtin.lsp_implementations, { desc = 'LSP find implementation(s)' })
-    vim.keymap.set({'v', 'n'}, '<leader>ld', builtin.lsp_definitions, { desc = 'LSP find definition(s)' })
-    vim.keymap.set({'v', 'n'}, '<leader>ltd', builtin.lsp_type_definitions, { desc = 'LSP find type definition(s)' })
+    { "<leader>lci", function() require('telescope.builtin').lsp_incoming_calls() end, mode = { 'v', 'n' }, desc = "LSP find incoming calls" },
+    { "<leader>lco", function() require('telescope.builtin').lsp_outgoing_calls() end, mode = { 'v', 'n' }, desc = "LSP find outgoing calls" },
+    { "<leader>li",  function() require('telescope.builtin').lsp_implementations() end, mode = { 'v', 'n' }, desc = "LSP find implementation(s)" },
+    { "<leader>ld",  function() require('telescope.builtin').lsp_definitions() end, mode = { 'v', 'n' }, desc = "LSP find definition(s)" },
+    { "<leader>ltd", function() require('telescope.builtin').lsp_type_definitions() end, mode = { 'v', 'n' }, desc = "LSP find type definition(s)" },
 
-    -- tree sitter things
-    vim.keymap.set('n', '<leader>fa', builtin.treesitter, { desc = 'List all using tree sitter' })
-
-
-  end
+    -- treesitter things
+    { "<leader>fa", function() require('telescope.builtin').treesitter() end, desc = "List all using treesitter" },
+  },
 }

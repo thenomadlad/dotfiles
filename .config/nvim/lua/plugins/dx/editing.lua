@@ -1,41 +1,30 @@
 return {
-  {"okuuva/auto-save.nvim", opts = { debounce_delay = 500 }},
+  { "okuuva/auto-save.nvim", opts = { debounce_delay = 500 } },
+
   {
     'windwp/nvim-autopairs',
     event = "InsertEnter",
-    config = true
+    opts = {},
   },
 
-  -- managing codeblocks
   {
     "numToStr/Comment.nvim",
     opts = {
-      ---LHS of toggle mappings in NORMAL mode
-      toggler = {
-        ---Line-comment toggle keymap
-        line = '<leader>/',
-      },
-      ---LHS of operator-pending mappings in NORMAL and VISUAL mode
-      opleader = {
-        ---Line-comment keymap
-        line = '<leader>/',
-      },
+      toggler = { line = '<leader>/' },
+      opleader = { line = '<leader>/' },
     },
-    lazy = false,
   },
 
-  -- showing indents
   {
     "lukas-reineke/indent-blankline.nvim",
+    event = "BufReadPost",
     main = "ibl",
-    opts = function()
-      require("ibl").setup()
-    end
+    opts = {},
   },
 
-  -- showing location in module
   {
     "nvim-treesitter/nvim-treesitter-context",
+    event = "BufReadPost",
     opts = {
       enable = true,
       multiwindow = false,
@@ -45,9 +34,9 @@ return {
       multiline_threshold = 20,
       trim_scope = 'outer',
       mode = 'cursor',
-      separator = '~',
+      separator = nil,
       zindex = 20,
       on_attach = nil,
     }
-  }
+  },
 }

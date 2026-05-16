@@ -9,8 +9,6 @@ vim.api.nvim_create_autocmd("FileType", {
     local ok, parser = pcall(vim.treesitter.get_parser, args.buf)
     if ok and parser then
       require("twilight").enable()
-    else
-      vim.notify("Skipping twilight - no treesitter parser", vim.log.levels.WARN)
     end
   end,
 })
