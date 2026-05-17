@@ -19,7 +19,7 @@ return {
       { "3rd/image.nvim", cond = function() return #vim.api.nvim_list_uis() > 0 end },
     },
     keys = {
-      { "<leader>e", "<Cmd>Neotree toggle<CR>", desc = "Toggle neotree explorer" },
+      { "<leader>e", "<Cmd>Neotree toggle last<CR>", desc = "Toggle neotree explorer" },
     },
     opts = {
       close_if_last_window = true,
@@ -33,7 +33,6 @@ return {
         "document_symbols",
       },
       document_symbols = {
-        follow_cursor = true,
         client_filters = "first",
       },
       filesystem = {
@@ -43,6 +42,7 @@ return {
           hide_gitignored = false,
         },
         follow_current_file = { enabled = true },
+        group_empty_dirs = true,
         use_libuv_file_watcher = true,
       },
       source_selector = {
@@ -55,6 +55,16 @@ return {
         },
       },
     },
+  },
+  {
+    "antosha417/nvim-lsp-file-operations",
+    dependencies = {
+      "nvim-lua/plenary.nvim",
+      "nvim-neo-tree/neo-tree.nvim", -- makes sure that this loads after Neo-tree.
+    },
+    config = function()
+      require("lsp-file-operations").setup()
+    end,
   },
 
   {

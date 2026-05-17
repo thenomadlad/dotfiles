@@ -19,3 +19,5 @@ vim.keymap.set("n", "<leader>?", function() require("key_guide").start("n", "<le
 vim.opt.cursorline = true
 vim.opt.number = true
 vim.opt.relativenumber = true
+
+vim.opt.wrap = false
