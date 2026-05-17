@@ -24,6 +24,18 @@ return {
     opts = {
       close_if_last_window = true,
       enable_diagnostics = true,
+      -- document_symbols must be listed here; source_selector alone does not load the source
+      -- (defaults.lua keeps document_symbols commented out of `sources`).
+      sources = {
+        "filesystem",
+        "buffers",
+        "git_status",
+        "document_symbols",
+      },
+      document_symbols = {
+        follow_cursor = true,
+        client_filters = "first",
+      },
       filesystem = {
         filtered_items = {
           visible = true,

@@ -14,6 +14,8 @@ return {
         "markdown_inline",
         "python",
         "java",
+        "kotlin",
+        "groovy",
       },
       auto_install = true,
       highlight = {
@@ -37,11 +39,14 @@ return {
     dependencies = {
       "williamboman/mason.nvim",
       "williamboman/mason-lspconfig.nvim",
-      "nvim-java/nvim-java",
+      "mfussenegger/nvim-jdtls",
       "mrcjkb/rustaceanvim",
       "folke/lazydev.nvim",
     },
     config = function()
+      -- Kotlin sources + Kotlin DSL (build.gradle.kts, *.kts) → kotlin ft for kotlin_language_server
+      vim.filetype.add { extension = { kt = "kotlin", kts = "kotlin" } }
+
       require("mason-lspconfig").setup {
         ensure_installed = {
           "lua_ls",
@@ -53,11 +58,30 @@ return {
           "eslint",
           "just",
           "jdtls",
+          "lemminx",
+          -- Gradle Kotlin DSL (.gradle.kts, *.kts scripts) + Kotlin sources
+          "kotlin_language_server",
+          -- Groovy Gradle DSL (build.gradle, settings.gradle)
+          "gradle_ls",
         },
         automatic_enable = {
           exclude = { "rust_analyzer" },
         },
       }
+
+      -- Merge after mason-lspconfig baselines (cmd from Mason, etc.); see nvim-lspconfig lsp/*.lua
+      vim.lsp.config("kotlin_language_server", {
+        init_options = {
+          storagePath = vim.fn.stdpath "cache" .. "/kotlin-language-server",
+        },
+      })
+      vim.lsp.config("gradle_ls", {
+        init_options = {
+          settings = {
+            gradleWrapperEnabled = true,
+          },
+        },
+      })
 
       vim.lsp.enable "astro"
       vim.lsp.enable "tailwindcss"
@@ -71,9 +95,6 @@ return {
           },
         },
       })
-
-      require("java").setup()
-      vim.lsp.enable "jdtls"
 
       vim.keymap.set("n", "<leader>la", vim.lsp.buf.code_action, { desc = "LSP code action" })
       vim.keymap.set("v", "<leader>la", vim.lsp.buf.code_action, { desc = "LSP code action" })
@@ -133,13 +154,13 @@ return {
     },
     config = function() require("mason-nvim-dap").setup() end,
     keys = {
-      { "<leader>dc", function() require("dap").continue() end, desc = "Continue or start a debug session" },
-      { "<leader>db", function() require("dap").toggle_breakpoint() end, desc = "Toggle breakpoint on line" },
-      { "<leader>drtc", function() require("dap").run_to_cursor() end, desc = "Run to cursor" },
-      { "<leader>dso", function() require("dap").step_over() end, desc = "Step over" },
-      { "<leader>dsi", function() require("dap").step_into() end, desc = "Step into" },
-      { "<leader>dt", function() require("dap").terminate() end, desc = "Terminate debug session" },
-      { "<leader>dv", function() vim.cmd [[DapViewToggle]] end, desc = "Dap view toggle" },
+      { "<leader>dc",   function() require("dap").continue() end,          desc = "Continue or start a debug session" },
+      { "<leader>db",   function() require("dap").toggle_breakpoint() end, desc = "Toggle breakpoint on line" },
+      { "<leader>drtc", function() require("dap").run_to_cursor() end,     desc = "Run to cursor" },
+      { "<leader>dso",  function() require("dap").step_over() end,         desc = "Step over" },
+      { "<leader>dsi",  function() require("dap").step_into() end,         desc = "Step into" },
+      { "<leader>dt",   function() require("dap").terminate() end,         desc = "Terminate debug session" },
+      { "<leader>dv",   function() vim.cmd [[DapViewToggle]] end,          desc = "Dap view toggle" },
       {
         "<leader>dw",
         function() vim.cmd [[DapViewWatch]] end,
@@ -166,6 +187,41 @@ return {
           },
         },
       }
+    end,
+  },
+
+  -- java
+  {
+    "mfussenegger/nvim-jdtls",
+    dependencies = { "williamboman/mason.nvim" },
+    opts = function(_, opts)
+      -- Lazy merges opts from fragments; `cmd` may be absent until we set defaults (see lsp/jdtls.lua in nvim-jdtls).
+      opts.cmd = opts.cmd or { "jdtls" }
+      -- Mason's jdtls recipe ships lombok at share/jdtls/lombok.jar (stable path; Package:get_install_path is removed in Mason 2.x).
+      local ok_settings, settings = pcall(require, "mason.settings")
+      local ok_path, path_mod = pcall(require, "mason-core.path")
+      if ok_settings and ok_path and settings.current.install_root_dir then
+        local lombok_jar = path_mod.concat { settings.current.install_root_dir, "share", "jdtls", "lombok.jar" }
+        if vim.uv.fs_stat(lombok_jar) then
+          table.insert(opts.cmd, "--jvm-arg=-javaagent:" .. lombok_jar)
+        end
+      end
+      -- prevent .settings, .project, etc files from being generated in the project folder
+      table.insert(opts.cmd, "--jvm-arg=-Djava.import.generatesMetadataFilesAtProjectRoot=false")
+      table.insert(opts.cmd, "--jvm-arg=-Xmx8G")
+
+      opts.settings = vim.tbl_deep_extend("force", opts.settings or {}, {
+        java = {
+          format = {
+            enabled = true,
+            comments = { enabled = false },
+            tabSize = 4,
+          },
+        },
+      })
+    end,
+    config = function(_, opts)
+      vim.lsp.config("jdtls", opts)
     end,
   },
 

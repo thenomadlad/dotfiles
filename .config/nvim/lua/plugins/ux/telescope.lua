@@ -17,6 +17,8 @@ return {
     { "<leader>li",  function() require('telescope.builtin').lsp_implementations() end, mode = { 'v', 'n' }, desc = "LSP find implementation(s)" },
     { "<leader>ld",  function() require('telescope.builtin').lsp_definitions() end, mode = { 'v', 'n' }, desc = "LSP find definition(s)" },
     { "<leader>ltd", function() require('telescope.builtin').lsp_type_definitions() end, mode = { 'v', 'n' }, desc = "LSP find type definition(s)" },
+    { "<leader>lds", function() require('telescope.builtin').lsp_document_symbols() end, desc = "LSP document symbols (this file)" },
+    { "<leader>lws", function() require('telescope.builtin').lsp_workspace_symbols() end, desc = "LSP workspace symbols" },
 
     -- treesitter things
     { "<leader>fa", function() require('telescope.builtin').treesitter() end, desc = "List all using treesitter" },
