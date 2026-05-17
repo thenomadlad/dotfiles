@@ -1,5 +1,5 @@
-require("settings")
-require("lazy_plugins")
+require "settings"
+require "lazy_plugins"
 
 -- auto twilight
 vim.api.nvim_create_autocmd("FileType", {
@@ -7,8 +7,6 @@ vim.api.nvim_create_autocmd("FileType", {
     if vim.bo[args.buf].buftype ~= "" then return end
 
     local ok, parser = pcall(vim.treesitter.get_parser, args.buf)
-    if ok and parser then
-      require("twilight").enable()
-    end
+    if ok and parser then require("twilight").enable() end
   end,
 })

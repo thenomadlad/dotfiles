@@ -1,17 +1,15 @@
 return {
   -- sensible defaults to UX
   {
-    'stevearc/dressing.nvim',
-    event = "VeryLazy"
+    "stevearc/dressing.nvim",
+    event = "VeryLazy",
   },
 
   -- lua/plugins/rose-pine.lua
   {
     "rose-pine/neovim",
     name = "rose-pine",
-    config = function()
-      vim.cmd("colorscheme rose-pine")
-    end
+    config = function() vim.cmd "colorscheme rose-pine" end,
   },
 
   -- focus and highlighting
@@ -19,8 +17,8 @@ return {
     "thenomadlad/twilight.nvim",
     branch = "fix/treesitter-parser-crash",
     opts = {
-      context = 25
-    }
+      context = 25,
+    },
   },
 
   -- cmdline and notifiations
@@ -41,28 +39,31 @@ return {
         opts = {
           top_down = false,
           render = "compact",
-          timeout = 1000
+          timeout = 1000,
         },
       },
-    }
+    },
   },
 
   -- diagnostic
   {
-    'rachartier/tiny-inline-diagnostic.nvim',
-    event = 'LspAttach',
+    "rachartier/tiny-inline-diagnostic.nvim",
+    event = "LspAttach",
     config = function()
       -- disable default
-      vim.diagnostic.config({
+      vim.diagnostic.config {
         virtual_text = false,
-      })
+      }
 
-      require('tiny-inline-diagnostic').setup({
+      require("tiny-inline-diagnostic").setup {
         options = {
           show_source = true,
-          multilines = true
-        }
-      })
-    end
-  }
+          multilines = true,
+        },
+      }
+    end,
+  },
+
+  -- html colors etc
+  { "brenoprata10/nvim-highlight-colors" },
 }
