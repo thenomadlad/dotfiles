@@ -39,6 +39,7 @@ return {
           { source = "filesystem" },
           { source = "buffers" },
           { source = "git_status" },
+          { source = "document_symbols" },
         },
       },
     },
