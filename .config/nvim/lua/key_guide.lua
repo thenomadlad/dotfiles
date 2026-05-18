@@ -35,7 +35,10 @@ local KBD_WIDTH       = 49 -- widest row: offset 1 + 12 keys × 4 chars
 local KBD_HEIGHT      = 4
 
 local WIDE_MIN        = 120 -- cols for: left-list | kbd | right-list
-local NARROW_MIN      = 71  -- cols for: combined-list | kbd
+local NARROW_MIN      = 71  -- cols for: stacked-lists | kbd
+
+local LIST_MAX_WIDE   = 10  -- items shown per side in wide mode
+local LIST_MAX_NARROW = 5   -- items per stacked panel in narrow mode
 
 local SHIFT_MAP       = {
   ["1"] = "!",
@@ -207,9 +210,10 @@ local function get_children(mode, prefix)
           end
         end
         children[#children + 1] = {
-          key   = key,
-          desc  = km.desc or (type(km.rhs) == "string" and km.rhs ~= "" and km.rhs) or "[Lua]",
-          group = is_grp,
+          key        = key,
+          desc       = km.desc or (type(km.rhs) == "string" and km.rhs ~= "" and km.rhs) or "[Lua]",
+          group      = is_grp,
+          is_default = false,
         }
       end
     end
@@ -223,7 +227,7 @@ local function get_children(mode, prefix)
       for key, desc in pairs(defaults) do
         if not seen[key] then
           seen[key] = true
-          children[#children + 1] = { key = key, desc = desc, group = false }
+          children[#children + 1] = { key = key, desc = desc, group = false, is_default = true }
         end
       end
     end
@@ -327,6 +331,29 @@ local function bucket(children)
   return left, right
 end
 
+-- Sort by: hint_count desc → custom before default → score desc → key asc.
+local function sort_children(children, scores, hint_counts)
+  local sorted = {}
+  for _, c in ipairs(children) do sorted[#sorted + 1] = c end
+  table.sort(sorted, function(a, b)
+    local ha = hint_counts and (hint_counts[a.key] or 0) or 0
+    local hb = hint_counts and (hint_counts[b.key] or 0) or 0
+    if ha ~= hb then return ha > hb end
+    if a.is_default ~= b.is_default then return not a.is_default end
+    local sa = scores and (scores[a.key] or 0) or 0
+    local sb = scores and (scores[b.key] or 0) or 0
+    if sa ~= sb then return sa > sb end
+    return a.key:lower() < b.key:lower()
+  end)
+  return sorted
+end
+
+local function top_n(list, n)
+  local r = {}
+  for i = 1, math.min(n, #list) do r[i] = list[i] end
+  return r
+end
+
 local function compute_list_rows(children, width)
   if #children == 0 then return 1 end
   local max_key = 0
@@ -336,11 +363,15 @@ local function compute_list_rows(children, width)
   return math.ceil(#children / ncol)
 end
 
---- Returns at most max_height lines; first line is always the prefix header.
-local function render_list_lines(children, width, max_height, prefix)
-  local lines = { "  " .. prefix .. "…" }
+--- Returns at most max_height lines.
+--- opts.show_header (default true): prepend the "  <prefix>…" header line.
+local function render_list_lines(children, width, max_height, prefix, opts)
+  local show_header = not (opts and opts.show_header == false)
+  local lines       = show_header and { "  " .. prefix .. "…" } or {}
+  local item_limit  = show_header and (max_height - 1) or max_height
+
   if #children == 0 then
-    lines[#lines + 1] = "  (none)"
+    if show_header then lines[#lines + 1] = "  (none)" end
     return lines
   end
 
@@ -350,7 +381,7 @@ local function render_list_lines(children, width, max_height, prefix)
   local ncol = math.max(1, math.floor(width / (cw + 2)))
   local nrow = math.ceil(#children / ncol)
 
-  for row = 1, math.min(nrow, max_height - 1) do
+  for row = 1, math.min(nrow, item_limit) do
     local parts = {}
     for col = 1, ncol do
       local item = children[(col - 1) * nrow + row]
@@ -485,17 +516,19 @@ local function open_panels(children, prefix, vim_mode)
     return ls, shift_kbd_hl(kbd_hl_raw, top_pad)
   end
 
-  local hint   = key_hints.get(vim_mode or "n", prefix)
-  -- height = list rows + 1 (prefix header) + 1 (hint footer)
+  local hc   = key_hints.hint_counts
+  local hint = key_hints.get(vim_mode or "n", prefix)
   local height, box
   local lp, kp, rp
 
   if mode == "wide" then
-    local lw = math.floor((cols - KBD_WIDTH) / 2)
-    local rw = cols - KBD_WIDTH - lw
-    height = math.min(math.max(compute_list_rows(left_ch, lw),
-      compute_list_rows(right_ch, rw),
-      KBD_HEIGHT) + 2, max_h)
+    -- Left: top LIST_MAX_WIDE left-hand keys; Right: top LIST_MAX_WIDE right-hand keys.
+    -- height = LIST_MAX_WIDE items + 1 header + 1 hint footer
+    local lw      = math.floor((cols - KBD_WIDTH) / 2)
+    local rw      = cols - KBD_WIDTH - lw
+    local left_s  = top_n(sort_children(left_ch,  scores, hc), LIST_MAX_WIDE)
+    local right_s = top_n(sort_children(right_ch, scores, hc), LIST_MAX_WIDE)
+    height = math.min(LIST_MAX_WIDE + 2, max_h)
     local row = compute_row(height)
     lp = make_popup(); kp = make_popup(); rp = make_popup()
     box = Layout.Box({
@@ -504,56 +537,65 @@ local function open_panels(children, prefix, vim_mode)
       Layout.Box(rp, { size = rw }),
     }, { dir = "row" })
     panels.layout = Layout(
-      {
-        relative = "editor",
-        position = { row = row, col = 0 },
-        size = { width = cols, height = height }
-      }, box)
+      { relative = "editor", position = { row = row, col = 0 }, size = { width = cols, height = height } },
+      box)
     panels.height = height; panels.row = row; panels.mode = mode
     panels.list1 = lp; panels.kbd = kp; panels.list2 = rp
     panels.layout:mount()
-    fill_popup(lp, render_list_lines(left_ch, lw, height - 1, prefix))
+    fill_popup(lp, render_list_lines(left_s,  lw, height - 1, prefix))
     append_hint_footer(lp, hint, lw)
-    fill_popup(rp, render_list_lines(right_ch, rw, height, prefix))
+    fill_popup(rp, render_list_lines(right_s, rw, height, prefix))
     local kl, kh = kbd_panel_lines(height); fill_popup(kp, kl, kh)
+
   elseif mode == "narrow" then
-    local lw       = cols - KBD_WIDTH
-    local combined = vim.list_extend(vim.list_extend({}, left_ch), right_ch)
-    height         = math.min(math.max(compute_list_rows(combined, lw), KBD_HEIGHT) + 2, max_h)
-    local row      = compute_row(height)
-    lp             = make_popup(); kp = make_popup()
-    box            = Layout.Box({
-      Layout.Box(lp, { size = lw }),
+    -- Two panels stacked vertically to the left of the keyboard.
+    -- Top: first LIST_MAX_NARROW items (with prefix header).
+    -- Bottom: next LIST_MAX_NARROW items (no header) + hint footer.
+    local lw      = cols - KBD_WIDTH
+    local all_s   = sort_children(children, scores, hc)
+    local top_s   = top_n(all_s, LIST_MAX_NARROW)
+    local bot_s   = {}
+    for i = LIST_MAX_NARROW + 1, math.min(LIST_MAX_NARROW * 2, #all_s) do
+      bot_s[#bot_s + 1] = all_s[i]
+    end
+    -- Each stacked panel: LIST_MAX_NARROW items + 1 extra (header or footer)
+    local half_h  = LIST_MAX_NARROW + 1
+    height = math.min(math.max(half_h * 2, KBD_HEIGHT), max_h)
+    local row = compute_row(height)
+    lp = make_popup(); rp = make_popup(); kp = make_popup()
+    box = Layout.Box({
+      Layout.Box({
+        Layout.Box(lp, { grow = 1 }),
+        Layout.Box(rp, { grow = 1 }),
+      }, { dir = "col", size = lw }),
       Layout.Box(kp, { size = KBD_WIDTH }),
     }, { dir = "row" })
-    panels.layout  = Layout(
-      {
-        relative = "editor",
-        position = { row = row, col = 0 },
-        size = { width = cols, height = height }
-      }, box)
-    panels.height  = height; panels.row = row; panels.mode = mode
-    panels.list1   = lp; panels.kbd = kp; panels.list2 = nil
+    panels.layout = Layout(
+      { relative = "editor", position = { row = row, col = 0 }, size = { width = cols, height = height } },
+      box)
+    panels.height = height; panels.row = row; panels.mode = mode
+    panels.list1 = lp; panels.list2 = rp; panels.kbd = kp
     panels.layout:mount()
-    fill_popup(lp, render_list_lines(combined, lw, height - 1, prefix))
-    append_hint_footer(lp, hint, lw)
+    local top_h = math.ceil(height / 2)
+    local bot_h = math.floor(height / 2)
+    fill_popup(lp, render_list_lines(top_s, lw, top_h, prefix))
+    fill_popup(rp, render_list_lines(bot_s, lw, bot_h - 1, prefix, { show_header = false }))
+    append_hint_footer(rp, hint, lw)
     local kl, kh = kbd_panel_lines(height); fill_popup(kp, kl, kh)
-  else -- minimal
-    local combined = vim.list_extend(vim.list_extend({}, left_ch), right_ch)
-    height = math.min(compute_list_rows(combined, cols) + 2, max_h)
+
+  else -- minimal: single list, no keyboard
+    local all_s = top_n(sort_children(children, scores, hc), LIST_MAX_WIDE)
+    height = math.min(LIST_MAX_WIDE + 2, max_h)
     local row = compute_row(height)
     lp = make_popup()
     box = Layout.Box(lp, {})
     panels.layout = Layout(
-      {
-        relative = "editor",
-        position = { row = row, col = 0 },
-        size = { width = cols, height = height }
-      }, box)
+      { relative = "editor", position = { row = row, col = 0 }, size = { width = cols, height = height } },
+      box)
     panels.height = height; panels.row = row; panels.mode = mode
     panels.list1 = lp; panels.kbd = nil; panels.list2 = nil
     panels.layout:mount()
-    fill_popup(lp, render_list_lines(combined, cols, height - 1, prefix))
+    fill_popup(lp, render_list_lines(all_s, cols, height - 1, prefix))
     append_hint_footer(lp, hint, cols)
   end
 end
@@ -589,32 +631,43 @@ local function refresh_panels(children, prefix, vim_mode)
     end
   end
 
+  local hc   = key_hints.hint_counts
   local hint = key_hints.get(vim_mode or "n", prefix)
 
   if mode == "wide" then
-    local lw = math.floor((cols - KBD_WIDTH) / 2)
-    local rw = cols - KBD_WIDTH - lw
-    local h  = math.min(math.max(compute_list_rows(left_ch, lw),
-      compute_list_rows(right_ch, rw),
-      KBD_HEIGHT) + 2, max_h)
+    local lw      = math.floor((cols - KBD_WIDTH) / 2)
+    local rw      = cols - KBD_WIDTH - lw
+    local left_s  = top_n(sort_children(left_ch,  scores, hc), LIST_MAX_WIDE)
+    local right_s = top_n(sort_children(right_ch, scores, hc), LIST_MAX_WIDE)
+    local h = math.min(LIST_MAX_WIDE + 2, max_h)
     reflow(h)
-    fill_popup(panels.list1, render_list_lines(left_ch, lw, h - 1, prefix))
+    fill_popup(panels.list1, render_list_lines(left_s,  lw, h - 1, prefix))
     append_hint_footer(panels.list1, hint, lw)
-    fill_popup(panels.list2, render_list_lines(right_ch, rw, h, prefix))
+    fill_popup(panels.list2, render_list_lines(right_s, rw, h, prefix))
     local kl, kh = kbd_panel_lines(h); fill_popup(panels.kbd, kl, kh)
+
   elseif mode == "narrow" then
-    local lw       = cols - KBD_WIDTH
-    local combined = vim.list_extend(vim.list_extend({}, left_ch), right_ch)
-    local h        = math.min(math.max(compute_list_rows(combined, lw), KBD_HEIGHT) + 2, max_h)
+    local lw    = cols - KBD_WIDTH
+    local all_s = sort_children(children, scores, hc)
+    local top_s = top_n(all_s, LIST_MAX_NARROW)
+    local bot_s = {}
+    for i = LIST_MAX_NARROW + 1, math.min(LIST_MAX_NARROW * 2, #all_s) do
+      bot_s[#bot_s + 1] = all_s[i]
+    end
+    local h     = math.min(math.max((LIST_MAX_NARROW + 1) * 2, KBD_HEIGHT), max_h)
     reflow(h)
-    fill_popup(panels.list1, render_list_lines(combined, lw, h - 1, prefix))
-    append_hint_footer(panels.list1, hint, lw)
+    local top_h = math.ceil(h / 2)
+    local bot_h = math.floor(h / 2)
+    fill_popup(panels.list1, render_list_lines(top_s, lw, top_h, prefix))
+    fill_popup(panels.list2, render_list_lines(bot_s, lw, bot_h - 1, prefix, { show_header = false }))
+    append_hint_footer(panels.list2, hint, lw)
     local kl, kh = kbd_panel_lines(h); fill_popup(panels.kbd, kl, kh)
+
   else
-    local combined = vim.list_extend(vim.list_extend({}, left_ch), right_ch)
-    local h = math.min(compute_list_rows(combined, cols) + 2, max_h)
+    local all_s = top_n(sort_children(children, scores, hc), LIST_MAX_WIDE)
+    local h = math.min(LIST_MAX_WIDE + 2, max_h)
     reflow(h)
-    fill_popup(panels.list1, render_list_lines(combined, cols, h - 1, prefix))
+    fill_popup(panels.list1, render_list_lines(all_s, cols, h - 1, prefix))
     append_hint_footer(panels.list1, hint, cols)
   end
 end

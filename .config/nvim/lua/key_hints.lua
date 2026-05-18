@@ -8,6 +8,10 @@ local M = {}
 local HINT_TTL_MS   = 8000
 local current       = nil  -- { text = string, kind = "hardtime"|"freq", expires = ms }
 
+-- Cumulative per-key hint counts: how many times each key has appeared as the
+-- "bad" key in a hardtime hint. Used to surface habitual problems first.
+M.hint_counts = {}
+
 local function now_ms() return vim.uv.now() end
 
 --- Call once after hardtime is loaded (e.g. from a VeryLazy autocmd or
@@ -19,6 +23,14 @@ function M.setup()
   local prev = ht_cfg.config.callback
   ht_cfg.config.callback = function(text)
     current = { text = text, kind = "hardtime", expires = now_ms() + HINT_TTL_MS }
+    -- Extract the "bad" sequence from "… instead of `XYZ`" and tally per key.
+    local bad = text:match("instead of `([^`]+)`")
+    if bad then
+      for i = 1, #bad do
+        local ch = bad:sub(i, i)
+        M.hint_counts[ch] = (M.hint_counts[ch] or 0) + 1
+      end
+    end
     if prev then pcall(prev, text) end
   end
 end

@@ -4,7 +4,7 @@ return {
     event = { "BufReadPre", "BufNewFile" },
     dependencies = {
       "williamboman/mason.nvim",
-      "williamboman/mason-lspconfig.nvim",
+      { "williamboman/mason-lspconfig.nvim", event = { "BufReadPre", "BufNewFile" } },
       "mfussenegger/nvim-jdtls",
       "mrcjkb/rustaceanvim",
       "folke/lazydev.nvim",
