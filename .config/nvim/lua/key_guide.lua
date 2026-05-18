@@ -1,9 +1,11 @@
 -- key_guide.lua
--- Interactive prefix navigator with live keyboard heatmap.
--- Left panel: which-key style column list. Right panel: QWERTY keyboard highlighting available keys.
--- Core loop: open float at bottom → read one char → navigate or execute → repeat.
+-- Blocking prefix navigator with keyboard heatmap (which-key style).
+-- Captures input via getcharstr(), shows nui panels, replays the completed sequence.
 
 local M               = {}
+
+local Layout          = require("nui.layout")
+local Popup           = require("nui.popup")
 
 -- ── constants ──────────────────────────────────────────────────────────────
 
@@ -17,12 +19,12 @@ local KEYBOARD_LAYOUT = {
   { "z", "x", "c", "v", "b", "n", "m", ",", ".", "/" },
 }
 local ROW_OFFSETS     = { 0, 1, 2, 3 }
-local KBD_WIDTH       = 49                      -- widest row: 12 keys × 4 chars + 1 offset
-local KBD_HEIGHT      = 4                       -- number of keyboard rows
-local GUTTER          = 2                       -- spaces between list and keyboard panels
-local MIN_COLS_KBD    = KBD_WIDTH + GUTTER + 20 -- 71: minimum columns to show keyboard
+local KBD_WIDTH       = 49 -- widest row: offset 1 + 12 keys × 4 chars
+local KBD_HEIGHT      = 4
 
--- shifted character for each symbol key (letters just use :upper())
+local WIDE_MIN        = 120 -- cols for: left-list | kbd | right-list
+local NARROW_MIN      = 71  -- cols for: combined-list | kbd
+
 local SHIFT_MAP       = {
   ["1"] = "!",
   ["2"] = "@",
@@ -45,13 +47,92 @@ local SHIFT_MAP       = {
   ["/"] = "?",
 }
 
-local KBD_NS          = vim.api.nvim_create_namespace("key_guide_kbd")
+local LEFT_KEYS       = {}
+do
+  local bases = { "1", "2", "3", "4", "5", "6",
+    "q", "w", "e", "r", "t",
+    "a", "s", "d", "f", "g",
+    "z", "x", "c", "v", "b" }
+  for _, k in ipairs(bases) do
+    LEFT_KEYS[k] = true
+    LEFT_KEYS[k:match("^%l$") and k:upper() or (SHIFT_MAP[k] or k)] = true
+  end
+end
+
+-- Built-in normal-mode actions that don't appear in nvim_get_keymap. User
+-- mappings take precedence; this just fills in the gaps so the heatmap and
+-- lists reflect what vim itself does at a given prefix.
+local DEFAULT_VIM_KEYS = {
+  [""] = {
+    -- motion
+    h = "left",
+    j = "down",
+    k = "up",
+    l = "right",
+    w = "next word",
+    W = "next WORD",
+    b = "prev word",
+    B = "prev WORD",
+    e = "end of word",
+    E = "end of WORD",
+    ["0"] = "line start",
+    ["$"] = "line end",
+    ["^"] = "first non-blank",
+    H = "screen top",
+    M = "screen middle",
+    L = "screen bottom",
+    G = "buffer end",
+    ["%"] = "match pair",
+    ["{"] = "prev paragraph",
+    ["}"] = "next paragraph",
+    -- search
+    n = "next match",
+    N = "prev match",
+    ["*"] = "search word fwd",
+    ["#"] = "search word back",
+    ["/"] = "search fwd",
+    ["?"] = "search back",
+    f = "find char",
+    F = "find char back",
+    t = "till char",
+    T = "till char back",
+    [";"] = "repeat f/t",
+    [","] = "reverse f/t",
+    -- edit
+    d = "delete (op)",
+    c = "change (op)",
+    y = "yank (op)",
+    p = "paste after",
+    P = "paste before",
+    x = "delete char",
+    X = "delete char back",
+    s = "substitute char",
+    S = "substitute line",
+    r = "replace char",
+    R = "Replace mode",
+    ["~"] = "toggle case",
+    J = "join lines",
+    u = "undo",
+    ["."] = "repeat",
+    -- insert/visual
+    i = "insert",
+    I = "insert at start",
+    a = "append",
+    A = "append at end",
+    o = "open below",
+    O = "open above",
+    v = "Visual",
+    V = "Visual line",
+    -- cmdline
+    [":"] = "command",
+  },
+}
+
+local KBD_NS = vim.api.nvim_create_namespace("key_guide_kbd")
 
 -- ── highlights ─────────────────────────────────────────────────────────────
 
 local function setup_highlights()
-  -- Resolve String's fg at setup time so we can pair it with bold=true.
-  -- (nvim_set_hl ignores extra attrs when `link` is set, so we do it manually.)
   local string_fg = vim.api.nvim_get_hl(0, { name = "String", link = false }).fg
   vim.api.nvim_set_hl(0, "KeyGuideNormal", { bg = "#1e1e2e", fg = "#cdd6f4", default = true })
   vim.api.nvim_set_hl(0, "KeyGuideKbdBracketUsed", { link = "String", default = true })
@@ -62,8 +143,6 @@ end
 
 -- ── keymap querying ────────────────────────────────────────────────────────
 
----@param lhs string
----@return string
 local function normalize_lhs(lhs)
   if vim.g.mapleader and vim.g.mapleader ~= "" then
     lhs = lhs:gsub("^" .. vim.pesc(vim.g.mapleader), "<leader>")
@@ -71,42 +150,55 @@ local function normalize_lhs(lhs)
   return lhs
 end
 
---- First key token from a string: handles <C-x>, <leader>, plain chars.
----@param s string
----@return string
+--- Map a raw getcharstr() byte to the token used in prefix strings.
+--- Direct byte comparison for the leader is more reliable than keytrans.
+local function normalize_key(raw)
+  if vim.g.mapleader and vim.g.mapleader ~= "" and raw == vim.g.mapleader then
+    return "<leader>"
+  end
+  return vim.fn.keytrans(raw)
+end
+
 local function next_token(s) return s:match "^(<[^>]+>)" or s:sub(1, 1) end
 
---- Returns immediate children of prefix in mode (global + buffer-local maps).
----@param mode string Vim mode, e.g. "n", "v"
----@param prefix string Key prefix to look up children for
----@return KeyChild[]
 local function get_children(mode, prefix)
   local keymaps = {}
   vim.list_extend(keymaps, vim.api.nvim_get_keymap(mode))
   vim.list_extend(keymaps, vim.api.nvim_buf_get_keymap(0, mode))
 
-  local seen     = {}
-  local children = {}
-
+  local seen, children = {}, {}
   for _, km in ipairs(keymaps) do
     local lhs = normalize_lhs(km.lhs)
     if vim.startswith(lhs, prefix) and #lhs > #prefix then
       local key = next_token(lhs:sub(#prefix + 1))
       if key and not seen[key] then
-        seen[key]      = true
-        local full     = prefix .. key
-        local is_group = false
+        seen[key]    = true
+        local full   = prefix .. key
+        local is_grp = false
         for _, km2 in ipairs(keymaps) do
           if vim.startswith(normalize_lhs(km2.lhs), full) and #normalize_lhs(km2.lhs) > #full then
-            is_group = true
-            break
+            is_grp = true; break
           end
         end
         children[#children + 1] = {
           key   = key,
           desc  = km.desc or (type(km.rhs) == "string" and km.rhs ~= "" and km.rhs) or "[Lua]",
-          group = is_group,
+          group = is_grp,
         }
+      end
+    end
+  end
+
+  -- Merge in built-in vim keys (normal mode only). User mappings already in
+  -- `seen` win; this only fills the gaps.
+  if mode == "n" then
+    local defaults = DEFAULT_VIM_KEYS[prefix]
+    if defaults then
+      for key, desc in pairs(defaults) do
+        if not seen[key] then
+          seen[key] = true
+          children[#children + 1] = { key = key, desc = desc, group = false }
+        end
       end
     end
   end
@@ -115,30 +207,21 @@ local function get_children(mode, prefix)
     if a.group ~= b.group then return a.group end
     return a.key:lower() < b.key:lower()
   end)
-
   return children
 end
 
 -- ── keyboard panel ─────────────────────────────────────────────────────────
 
---- Build keyboard ASCII lines and raw highlight entries from children.
---- Each key is rendered as [xX] — 4 chars — with lower and upper highlighted independently.
---- Highlights use 0-indexed line (within kbd block) and 0-indexed byte column offsets.
----@param children KeyChild[]
----@return string[], table[]
 local function build_kbd_lines(children)
-  -- case-sensitive: "a" and "A" are distinct entries
   local mapped = {}
   for _, child in ipairs(children) do
     if #child.key == 1 then mapped[child.key] = true end
   end
 
-  local lines      = {}
-  local highlights = {}
-
+  local lines, highlights = {}, {}
   for row_idx, row in ipairs(KEYBOARD_LAYOUT) do
     local line   = string.rep(" ", ROW_OFFSETS[row_idx])
-    local line_0 = #lines -- 0-indexed line within this block
+    local line_0 = #lines
 
     for _, key in ipairs(row) do
       local shifted               = key:match("^%l$") and key:upper() or (SHIFT_MAP[key] or key)
@@ -150,7 +233,7 @@ local function build_kbd_lines(children)
       local lo_hl                 = lo_map and "KeyGuideKbdLetterUsed" or "KeyGuideKbdLetterFree"
       local hi_hl                 = hi_map and "KeyGuideKbdLetterUsed" or "KeyGuideKbdLetterFree"
 
-      local cs                    = #line -- 0-indexed byte col of the opening bracket
+      local cs                    = #line
       highlights[#highlights + 1] = { line = line_0, cs = cs, ce = cs + 1, group = br_hl }
       highlights[#highlights + 1] = { line = line_0, cs = cs + 1, ce = cs + 2, group = lo_hl }
       highlights[#highlights + 1] = { line = line_0, cs = cs + 2, ce = cs + 3, group = hi_hl }
@@ -158,194 +241,374 @@ local function build_kbd_lines(children)
 
       line                        = line .. "[" .. key .. shifted .. "]"
     end
-
     lines[#lines + 1] = line
   end
-
   return lines, highlights
 end
 
--- ── rendering ──────────────────────────────────────────────────────────────
+-- ── list rendering ─────────────────────────────────────────────────────────
 
---- Build combined buffer lines and absolute buffer highlights.
---- Buffer structure (0-indexed):
----   line 0: blank
----   line 1: "  <prefix>…"  (header)
----   line 2: blank
----   lines 3..(3+body_height-1): merged list + keyboard body
----   last line: blank footer
----@param children KeyChild[]
----@param prefix string
----@return string[], table[]
-local function render(children, prefix)
-  local show_kbd   = vim.o.columns >= MIN_COLS_KBD
-  local list_width = show_kbd and (vim.o.columns - KBD_WIDTH - GUTTER) or (vim.o.columns - 4)
-
-  -- ── list panel ──────────────────────────────────────────────────────────
-  local max_key    = 0
-  for _, item in ipairs(children) do max_key = math.max(max_key, #item.key) end
-  local col_width = max_key + #SEPARATOR + 1 + MAX_DESC
-  local ncols     = math.max(1, math.floor((list_width - 4) / (col_width + 2)))
-  local nrows     = (#children == 0) and 1 or math.ceil(#children / ncols)
-
-  local list_body = {}
-  if #children == 0 then
-    list_body[1] = "  (no mappings for " .. prefix .. ")"
-  else
-    for row = 1, nrows do
-      local parts = {}
-      for col = 1, ncols do
-        local item = children[(col - 1) * nrows + row]
-        if item then
-          local key_pad = string.rep(" ", max_key - #item.key) .. item.key
-          local desc    = item.desc
-          if #desc > MAX_DESC then desc = desc:sub(1, MAX_DESC - 1) .. "…" end
-          local marker      = item.group and "+" or " "
-          parts[#parts + 1] = key_pad .. SEPARATOR .. marker .. desc
-        end
-      end
-      list_body[#list_body + 1] = "  " .. table.concat(parts, "  ")
-    end
-  end
-
-  -- ── keyboard panel ──────────────────────────────────────────────────────
-  local kbd_lines, kbd_hl_raw = {}, {}
-  if show_kbd then kbd_lines, kbd_hl_raw = build_kbd_lines(children) end
-
-  -- ── merge into single buffer lines ──────────────────────────────────────
-  local body_height = math.max(nrows, show_kbd and KBD_HEIGHT or 0)
-
-  local function lpad(s, width)
-    if #s >= width then return s:sub(1, width) end
-    return s .. string.rep(" ", width - #s)
-  end
-
-  local lines = { "", "  " .. prefix .. "…", "" }
-
-  for i = 1, body_height do
-    local left  = list_body[i] or ""
-    local right = (show_kbd and kbd_lines[i]) or ""
-    if show_kbd then
-      lines[#lines + 1] = lpad(left, list_width) .. string.rep(" ", GUTTER) .. right
+local function bucket(children)
+  local left, right = {}, {}
+  for _, c in ipairs(children) do
+    if #c.key == 1 and LEFT_KEYS[c.key] then
+      left[#left + 1] = c
     else
-      lines[#lines + 1] = left
+      right[#right + 1] = c
     end
   end
-  lines[#lines + 1] = "" -- footer blank
-
-  -- ── translate keyboard highlights to absolute buffer coordinates ─────────
-  -- Keyboard block starts at buffer line 3 (0-indexed), col offset = list_width + GUTTER
-  local highlights  = {}
-  local kbd_col_off = show_kbd and (list_width + GUTTER) or 0
-  for _, hl in ipairs(kbd_hl_raw) do
-    highlights[#highlights + 1] = {
-      line  = 3 + hl.line,
-      cs    = kbd_col_off + hl.cs,
-      ce    = kbd_col_off + hl.ce,
-      group = hl.group,
-    }
-  end
-
-  return lines, highlights
+  return left, right
 end
 
--- ── window management ──────────────────────────────────────────────────────
+local function compute_list_rows(children, width)
+  if #children == 0 then return 1 end
+  local max_key = 0
+  for _, c in ipairs(children) do max_key = math.max(max_key, #c.key) end
+  local cw   = max_key + #SEPARATOR + 1 + MAX_DESC
+  local ncol = math.max(1, math.floor(width / (cw + 2)))
+  return math.ceil(#children / ncol)
+end
 
----@class WinState
----@field win integer?
----@field buf integer?
-local w = { win = nil, buf = nil }
-
----@param lines string[]
----@param highlights table[]
-local function open_win(lines, highlights)
-  local max_height = math.max(1, vim.o.lines - vim.o.cmdheight - 2)
-  local height     = math.min(#lines, max_height)
-  local row        = math.max(0, vim.o.lines - height - vim.o.cmdheight - 1)
-
-  if not (w.buf and vim.api.nvim_buf_is_valid(w.buf)) then
-    w.buf                   = vim.api.nvim_create_buf(false, true)
-    vim.bo[w.buf].bufhidden = "wipe"
-    vim.bo[w.buf].filetype  = "keyguide"
+--- Returns at most max_height lines; first line is always the prefix header.
+local function render_list_lines(children, width, max_height, prefix)
+  local lines = { "  " .. prefix .. "…" }
+  if #children == 0 then
+    lines[#lines + 1] = "  (none)"
+    return lines
   end
 
-  vim.bo[w.buf].modifiable = true
-  vim.api.nvim_buf_clear_namespace(w.buf, KBD_NS, 0, -1)
-  vim.api.nvim_buf_set_lines(w.buf, 0, -1, false, lines)
-  for _, hl in ipairs(highlights) do
-    vim.api.nvim_buf_add_highlight(w.buf, KBD_NS, hl.group, hl.line, hl.cs, hl.ce)
-  end
-  vim.bo[w.buf].modifiable = false
+  local max_key = 0
+  for _, c in ipairs(children) do max_key = math.max(max_key, #c.key) end
+  local cw   = max_key + #SEPARATOR + 1 + MAX_DESC
+  local ncol = math.max(1, math.floor(width / (cw + 2)))
+  local nrow = math.ceil(#children / ncol)
 
-  local cfg = {
-    relative  = "editor",
-    row       = row,
-    col       = 0,
-    width     = vim.o.columns,
-    height    = height,
-    style     = "minimal",
-    focusable = false,
-    noautocmd = true,
-    zindex    = 200,
+  for row = 1, math.min(nrow, max_height - 1) do
+    local parts = {}
+    for col = 1, ncol do
+      local item = children[(col - 1) * nrow + row]
+      if item then
+        local key_pad = string.rep(" ", max_key - #item.key) .. item.key
+        local desc    = item.desc
+        if #desc > MAX_DESC then desc = desc:sub(1, MAX_DESC - 1) .. "…" end
+        parts[#parts + 1] = key_pad .. SEPARATOR .. (item.group and "+" or " ") .. desc
+      end
+    end
+    lines[#lines + 1] = "  " .. table.concat(parts, "  ")
+  end
+  return lines
+end
+
+-- ── popup helpers ──────────────────────────────────────────────────────────
+
+local function make_popup()
+  return Popup {
+    border      = "none",
+    focusable   = false,
+    zindex      = 200,
+    win_options = {
+      winhighlight = "Normal:KeyGuideNormal,EndOfBuffer:KeyGuideNormal",
+    },
+    buf_options = {
+      bufhidden = "wipe",
+      filetype  = "keyguide",
+    },
   }
+end
 
-  if w.win and vim.api.nvim_win_is_valid(w.win) then
-    vim.api.nvim_win_set_config(w.win, cfg)
+local function fill_popup(popup, lines, highlights)
+  local buf = popup.bufnr
+  if not buf or not vim.api.nvim_buf_is_valid(buf) then return end
+  vim.bo[buf].modifiable = true
+  vim.api.nvim_buf_clear_namespace(buf, KBD_NS, 0, -1)
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+  if highlights then
+    for _, hl in ipairs(highlights) do
+      vim.api.nvim_buf_add_highlight(buf, KBD_NS, hl.group, hl.line, hl.cs, hl.ce)
+    end
+  end
+  vim.bo[buf].modifiable = false
+end
+
+local function shift_kbd_hl(raw, offset)
+  local out = {}
+  for _, hl in ipairs(raw) do
+    out[#out + 1] = { line = hl.line + offset, cs = hl.cs, ce = hl.ce, group = hl.group }
+  end
+  return out
+end
+
+-- ── layout state ───────────────────────────────────────────────────────────
+
+local panels = {
+  layout = nil,
+  height = 0,
+  row = 0,
+  mode = nil,
+  list1 = nil,
+  kbd = nil,
+  list2 = nil
+}
+
+-- Autocmds waiting to reopen the guide after fed keys settle. Lives in an
+-- augroup so we can clear all of them in one shot.
+local RESUME_AUGROUP = vim.api.nvim_create_augroup("KeyGuideResume", { clear = true })
+
+local function clear_pending_resume()
+  vim.api.nvim_clear_autocmds({ group = RESUME_AUGROUP })
+end
+
+local function compute_row(height)
+  local lines_below = vim.fn.line("w$") - vim.fn.line(".")
+  if lines_below < height then return 0 end
+  return math.max(0, vim.o.lines - height - vim.o.cmdheight - 1)
+end
+
+local function layout_mode(cols)
+  if cols >= WIDE_MIN then
+    return "wide"
+  elseif cols >= NARROW_MIN then
+    return "narrow"
   else
-    w.win = vim.api.nvim_open_win(w.buf, false, cfg)
-    vim.wo[w.win].winhighlight = "Normal:KeyGuideNormal,EndOfBuffer:KeyGuideNormal"
+    return "minimal"
   end
 end
 
-local function close_win()
-  if w.win and vim.api.nvim_win_is_valid(w.win) then
-    pcall(vim.api.nvim_win_close, w.win, true)
+local function close_panels()
+  if panels.layout then
+    pcall(function() panels.layout:unmount() end)
   end
-  w.win = nil
-  w.buf = nil
+  panels.layout = nil; panels.height = 0; panels.row = 0; panels.mode = nil
+  panels.list1  = nil; panels.kbd = nil; panels.list2 = nil
 end
 
--- ── main loop ──────────────────────────────────────────────────────────────
+local function open_panels(children, prefix)
+  close_panels()
 
----@param mode? string Vim mode, defaults to "n"
----@param initial_prefix? string Starting prefix, defaults to ""
+  local cols                = vim.o.columns
+  local max_h               = math.max(1, vim.o.lines - vim.o.cmdheight - 2)
+  local mode                = layout_mode(cols)
+
+  local left_ch, right_ch   = bucket(children)
+  local kbd_raw, kbd_hl_raw = build_kbd_lines(children)
+
+  local function kbd_panel_lines(h)
+    local top_pad = math.max(0, math.floor((h - KBD_HEIGHT) / 2))
+    local ls = {}
+    for _ = 1, top_pad do ls[#ls + 1] = "" end
+    for _, l in ipairs(kbd_raw) do ls[#ls + 1] = l end
+    while #ls < h do ls[#ls + 1] = "" end
+    return ls, shift_kbd_hl(kbd_hl_raw, top_pad)
+  end
+
+  local height, box
+  local lp, kp, rp
+
+  if mode == "wide" then
+    local lw = math.floor((cols - KBD_WIDTH) / 2)
+    local rw = cols - KBD_WIDTH - lw
+    height = math.min(math.max(compute_list_rows(left_ch, lw),
+      compute_list_rows(right_ch, rw),
+      KBD_HEIGHT) + 1, max_h)
+    local row = compute_row(height)
+    lp = make_popup(); kp = make_popup(); rp = make_popup()
+    box = Layout.Box({
+      Layout.Box(lp, { size = lw }),
+      Layout.Box(kp, { size = KBD_WIDTH }),
+      Layout.Box(rp, { size = rw }),
+    }, { dir = "row" })
+    panels.layout = Layout(
+      {
+        relative = "editor",
+        position = { row = row, col = 0 },
+        size = { width = cols, height = height }
+      }, box)
+    panels.height = height; panels.row = row; panels.mode = mode
+    panels.list1 = lp; panels.kbd = kp; panels.list2 = rp
+    panels.layout:mount()
+    fill_popup(lp, render_list_lines(left_ch, lw, height, prefix))
+    fill_popup(rp, render_list_lines(right_ch, rw, height, prefix))
+    local kl, kh = kbd_panel_lines(height); fill_popup(kp, kl, kh)
+  elseif mode == "narrow" then
+    local lw       = cols - KBD_WIDTH
+    local combined = vim.list_extend(vim.list_extend({}, left_ch), right_ch)
+    height         = math.min(math.max(compute_list_rows(combined, lw), KBD_HEIGHT) + 1, max_h)
+    local row      = compute_row(height)
+    lp             = make_popup(); kp = make_popup()
+    box            = Layout.Box({
+      Layout.Box(lp, { size = lw }),
+      Layout.Box(kp, { size = KBD_WIDTH }),
+    }, { dir = "row" })
+    panels.layout  = Layout(
+      {
+        relative = "editor",
+        position = { row = row, col = 0 },
+        size = { width = cols, height = height }
+      }, box)
+    panels.height  = height; panels.row = row; panels.mode = mode
+    panels.list1   = lp; panels.kbd = kp; panels.list2 = nil
+    panels.layout:mount()
+    fill_popup(lp, render_list_lines(combined, lw, height, prefix))
+    local kl, kh = kbd_panel_lines(height); fill_popup(kp, kl, kh)
+  else -- minimal
+    local combined = vim.list_extend(vim.list_extend({}, left_ch), right_ch)
+    height = math.min(compute_list_rows(combined, cols) + 1, max_h)
+    local row = compute_row(height)
+    lp = make_popup()
+    box = Layout.Box(lp, {})
+    panels.layout = Layout(
+      {
+        relative = "editor",
+        position = { row = row, col = 0 },
+        size = { width = cols, height = height }
+      }, box)
+    panels.height = height; panels.row = row; panels.mode = mode
+    panels.list1 = lp; panels.kbd = nil; panels.list2 = nil
+    panels.layout:mount()
+    fill_popup(lp, render_list_lines(combined, cols, height, prefix))
+  end
+end
+
+--- Fast path: reuse mounted popups, refill buffers, and reflow position/size if needed.
+local function refresh_panels(children, prefix)
+  local cols                = vim.o.columns
+  local max_h               = math.max(1, vim.o.lines - vim.o.cmdheight - 2)
+  local mode                = panels.mode
+
+  local left_ch, right_ch   = bucket(children)
+  local kbd_raw, kbd_hl_raw = build_kbd_lines(children)
+
+  local function kbd_panel_lines(h)
+    local top_pad = math.max(0, math.floor((h - KBD_HEIGHT) / 2))
+    local ls = {}
+    for _ = 1, top_pad do ls[#ls + 1] = "" end
+    for _, l in ipairs(kbd_raw) do ls[#ls + 1] = l end
+    while #ls < h do ls[#ls + 1] = "" end
+    return ls, shift_kbd_hl(kbd_hl_raw, top_pad)
+  end
+
+  local function reflow(new_h)
+    local new_row = compute_row(new_h)
+    if new_h ~= panels.height or new_row ~= panels.row then
+      panels.height = new_h
+      panels.row    = new_row
+      panels.layout:update {
+        position = { row = new_row, col = 0 },
+        size     = { width = cols, height = new_h },
+      }
+    end
+  end
+
+  if mode == "wide" then
+    local lw = math.floor((cols - KBD_WIDTH) / 2)
+    local rw = cols - KBD_WIDTH - lw
+    local h  = math.min(math.max(compute_list_rows(left_ch, lw),
+      compute_list_rows(right_ch, rw),
+      KBD_HEIGHT) + 1, max_h)
+    reflow(h)
+    fill_popup(panels.list1, render_list_lines(left_ch, lw, h, prefix))
+    fill_popup(panels.list2, render_list_lines(right_ch, rw, h, prefix))
+    local kl, kh = kbd_panel_lines(h); fill_popup(panels.kbd, kl, kh)
+  elseif mode == "narrow" then
+    local lw       = cols - KBD_WIDTH
+    local combined = vim.list_extend(vim.list_extend({}, left_ch), right_ch)
+    local h        = math.min(math.max(compute_list_rows(combined, lw), KBD_HEIGHT) + 1, max_h)
+    reflow(h)
+    fill_popup(panels.list1, render_list_lines(combined, lw, h, prefix))
+    local kl, kh = kbd_panel_lines(h); fill_popup(panels.kbd, kl, kh)
+  else
+    local combined = vim.list_extend(vim.list_extend({}, left_ch), right_ch)
+    local h = math.min(compute_list_rows(combined, cols) + 1, max_h)
+    reflow(h)
+    fill_popup(panels.list1, render_list_lines(combined, cols, h, prefix))
+  end
+end
+
+-- ── public API ─────────────────────────────────────────────────────────────
+
+--- Open the key guide for `initial_prefix` and enter a blocking input loop.
+---
+--- Each keypress either drills into a subgroup (if children exist at that prefix)
+--- or closes the guide and replays the full raw sequence so Neovim executes it.
+--- ESC or Ctrl-C cancels without replaying anything.
+---
+---@param mode?           string vim mode ("n", "v", …), defaults to "n"
+---@param initial_prefix? string starting prefix shown on open, defaults to ""
 function M.start(mode, initial_prefix)
-  mode         = mode or "n"
-  local prefix = initial_prefix or ""
+  mode           = mode or "n"
+  initial_prefix = initial_prefix or ""
+
+  -- Cancel any stale resume autocmd from a prior invocation.
+  clear_pending_resume()
+
+  local norm_prefix = initial_prefix
+  -- Raw bytes typed inside the loop. Does NOT include bytes for initial_prefix
+  -- (those were already consumed by whatever keymap triggered M.start).
+  local raw_bytes   = ""
 
   setup_highlights()
 
-  while true do
-    local children          = get_children(mode, prefix)
-    local lines, highlights = render(children, prefix)
-    open_win(lines, highlights)
-    vim.cmd.redraw()
+  local ch = get_children(mode, norm_prefix)
+  if panels.layout and layout_mode(vim.o.columns) == panels.mode then
+    refresh_panels(ch, norm_prefix)
+  else
+    open_panels(ch, norm_prefix)
+  end
+  vim.cmd("redraw!")
 
+  while true do
     local ok, char = pcall(vim.fn.getcharstr)
-    if not ok then
-      close_win()
-      break
+
+    -- ESC (\27) or any error (e.g. Ctrl-C) cancels the guide.
+    if not ok or char == "\27" then
+      close_panels()
+      vim.cmd("redraw!")
+      return
     end
 
-    local key = vim.fn.keytrans(char)
+    local norm_char = normalize_key(char)
+    local candidate = norm_prefix .. norm_char
+    local next_ch   = get_children(mode, candidate)
 
-    if key == "<Esc>" then
-      close_win()
-      break
-    elseif key == "<BS>" then
-      if prefix == initial_prefix then
-        close_win()
-        break
+    if #next_ch > 0 then
+      -- Subgroup: drill down, fast-refresh the panels.
+      norm_prefix = candidate
+      raw_bytes   = raw_bytes .. char
+      if layout_mode(vim.o.columns) ~= panels.mode or not panels.layout then
+        open_panels(next_ch, norm_prefix)
+      else
+        refresh_panels(next_ch, norm_prefix)
       end
-      local last = prefix:match "(<[^>]+>)$" or prefix:sub(-1)
-      prefix = prefix:sub(1, #prefix - #last)
+      vim.cmd("redraw!")
     else
-      prefix = prefix .. key
-      if #get_children(mode, prefix) == 0 then
-        close_win()
-        vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes(prefix, true, true, true), "mit", false)
-        break
+      -- Leave panels mounted: in-place moves (j/k/etc.) stay flicker-free.
+      -- ModeChanged below will close them only if we leave normal mode.
+      local prefix_raw = initial_prefix:gsub("<leader>", vim.g.mapleader or "")
+      local full = prefix_raw .. raw_bytes .. char
+      if full ~= "" then
+        vim.api.nvim_feedkeys(full, "m", true)
       end
+
+      clear_pending_resume()
+
+      -- Hide panels when the fed keys put us into insert / cmdline / fzf / etc.
+      vim.api.nvim_create_autocmd("ModeChanged", {
+        group = RESUME_AUGROUP,
+        callback = function()
+          if vim.fn.mode() ~= "n" then close_panels() end
+        end,
+      })
+
+      -- Resume the input loop once neovim is idle back in normal mode.
+      vim.api.nvim_create_autocmd("SafeState", {
+        group = RESUME_AUGROUP,
+        callback = function()
+          if vim.fn.mode() ~= "n" then return end
+          clear_pending_resume()
+          vim.schedule(function() M.start(mode, initial_prefix) end)
+        end,
+      })
+      return
     end
   end
 end

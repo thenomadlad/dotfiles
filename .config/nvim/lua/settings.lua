@@ -13,7 +13,7 @@ vim.opt.fillchars = { eob = " " }
 
 vim.keymap.set("i", "jk", "<ESC>", { silent = true })
 vim.keymap.set("n", "<leader>c", ":bd<CR>", { silent = true })
-vim.keymap.set("n", "<leader>?", function() require("key_guide").start("n", "<leader>") end, { desc = "Key guide" })
+vim.keymap.set("n", "<leader>?", function() require("key_guide").start("n") end, { desc = "Key guide" })
 
 -- numbering
 vim.opt.cursorline = true
