@@ -19,8 +19,10 @@ return {
       { "3rd/image.nvim", cond = function() return #vim.api.nvim_list_uis() > 0 end },
     },
     keys = {
-      { "<leader>e", "<Cmd>Neotree toggle last<CR>", desc = "Toggle neotree explorer" },
+      { "<leader>e", "<Cmd>Neotree toggle last position=left<CR>", desc = "Toggle neotree explorer" },
     },
+    ---@module 'neo-tree'
+    ---@type neotree.Config
     opts = {
       close_if_last_window = true,
       enable_diagnostics = true,
@@ -46,6 +48,10 @@ return {
         use_libuv_file_watcher = true,
       },
       source_selector = {
+        truncation_character = "…",
+        tabs_layout = "equal",
+        content_layout = "center",
+        separator = { left = "", right = "" },
         winbar = true,
         sources = {
           { source = "filesystem" },
@@ -54,6 +60,12 @@ return {
           { source = "document_symbols" },
         },
       },
+      window = {
+        -- default is float - lets us see a floating window on opening a directory
+        -- and overriding netrw default behavior. Use position=left when
+        -- opening Neotree
+        position = "float"
+      }
     },
   },
   {

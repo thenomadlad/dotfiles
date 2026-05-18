@@ -6,6 +6,18 @@ local M               = {}
 
 local Layout          = require("nui.layout")
 local Popup           = require("nui.popup")
+local key_stats       = require("key_stats")
+local key_hints       = require("key_hints")
+key_stats.setup()
+
+-- Defer hardtime hook until plugins are loaded; safe no-op if not installed.
+vim.api.nvim_create_autocmd("User", {
+  pattern = "VeryLazy",
+  once    = true,
+  callback = function() pcall(key_hints.setup) end,
+})
+-- Also attempt immediately in case this loads after VeryLazy has already fired.
+pcall(key_hints.setup)
 
 -- ── constants ──────────────────────────────────────────────────────────────
 
@@ -133,12 +145,26 @@ local KBD_NS = vim.api.nvim_create_namespace("key_guide_kbd")
 -- ── highlights ─────────────────────────────────────────────────────────────
 
 local function setup_highlights()
-  local string_fg = vim.api.nvim_get_hl(0, { name = "String", link = false }).fg
   vim.api.nvim_set_hl(0, "KeyGuideNormal", { bg = "#1e1e2e", fg = "#cdd6f4", default = true })
   vim.api.nvim_set_hl(0, "KeyGuideKbdBracketUsed", { link = "String", default = true })
-  vim.api.nvim_set_hl(0, "KeyGuideKbdLetterUsed", { fg = string_fg, bold = true, default = true })
   vim.api.nvim_set_hl(0, "KeyGuideKbdBracketFree", { link = "NonText", default = true })
-  vim.api.nvim_set_hl(0, "KeyGuideKbdLetterFree", { link = "Comment", default = true })
+
+  -- Letter tiers by usage frequency (within the current prefix).
+  --   Unused = key has no mapping/default action
+  --   Cold   = mapped but never pressed
+  --   Cool   = low frequency
+  --   Normal = mid frequency
+  --   Warm   = high
+  --   Hot    = top of the distribution
+  vim.api.nvim_set_hl(0, "KeyGuideKbdLetterUnused", { link = "Comment", default = true })
+  vim.api.nvim_set_hl(0, "KeyGuideKbdLetterCold", { link = "Function", default = true })
+  vim.api.nvim_set_hl(0, "KeyGuideKbdLetterCool", { link = "String", default = true })
+  vim.api.nvim_set_hl(0, "KeyGuideKbdLetterNormal", { link = "String", default = true, bold = true })
+  vim.api.nvim_set_hl(0, "KeyGuideKbdLetterWarm", { link = "Type", default = true, bold = true })
+  vim.api.nvim_set_hl(0, "KeyGuideKbdLetterHot", { link = "WarningMsg", default = true, bold = true })
+  -- Hint footer
+  vim.api.nvim_set_hl(0, "KeyGuideHintHardtime", { link = "WarningMsg", default = true })
+  vim.api.nvim_set_hl(0, "KeyGuideHintFreq", { link = "Comment", default = true })
 end
 
 -- ── keymap querying ────────────────────────────────────────────────────────
@@ -212,11 +238,52 @@ end
 
 -- ── keyboard panel ─────────────────────────────────────────────────────────
 
-local function build_kbd_lines(children)
+-- ── heatmap tier bucketing ─────────────────────────────────────────────────
+
+-- Given a { key → score } map, return { key → tier_hl_suffix } where suffix
+-- is one of: Hot / Warm / Normal / Cool / Cold / Unused.
+-- Tier boundaries are computed from the distribution so they adapt to each
+-- prefix rather than a fixed global threshold.
+local function compute_tiers(mapped_keys, scores)
+  -- Collect scores for keys that actually appear as children (mapped).
+  local values = {}
+  for key in pairs(mapped_keys) do
+    local s = scores[key] or 0
+    values[#values + 1] = s
+  end
+  table.sort(values)
+
+  local n = #values
+  -- Percentile thresholds: top 10% hot, next 25% warm, next 40% normal, rest cool.
+  local function pct(p) return values[math.max(1, math.floor(n * p))] or 0 end
+  local hot_min  = pct(0.90)
+  local warm_min = pct(0.65)
+  local norm_min = pct(0.25)
+  -- Any score > 0 is at least Cool; zero means Cold (mapped but never pressed).
+
+  local tiers = {}
+  for key in pairs(mapped_keys) do
+    local s = scores[key] or 0
+    local t
+    if     hot_min  > 0 and s >= hot_min  then t = "Hot"
+    elseif warm_min > 0 and s >= warm_min then t = "Warm"
+    elseif norm_min > 0 and s >= norm_min then t = "Normal"
+    elseif s > 0                           then t = "Cool"
+    else                                        t = "Cold"
+    end
+    tiers[key] = "KeyGuideKbdLetter" .. t
+  end
+  return tiers
+end
+
+local function build_kbd_lines(children, scores)
+  scores = scores or {}
   local mapped = {}
   for _, child in ipairs(children) do
     if #child.key == 1 then mapped[child.key] = true end
   end
+
+  local tiers = compute_tiers(mapped, scores)
 
   local lines, highlights = {}, {}
   for row_idx, row in ipairs(KEYBOARD_LAYOUT) do
@@ -224,14 +291,14 @@ local function build_kbd_lines(children)
     local line_0 = #lines
 
     for _, key in ipairs(row) do
-      local shifted               = key:match("^%l$") and key:upper() or (SHIFT_MAP[key] or key)
-      local lo_map                = mapped[key] == true
-      local hi_map                = mapped[shifted] == true
-      local any_map               = lo_map or hi_map
+      local shifted = key:match("^%l$") and key:upper() or (SHIFT_MAP[key] or key)
+      local lo_map  = mapped[key] == true
+      local hi_map  = mapped[shifted] == true
+      local any_map = lo_map or hi_map
 
-      local br_hl                 = any_map and "KeyGuideKbdBracketUsed" or "KeyGuideKbdBracketFree"
-      local lo_hl                 = lo_map and "KeyGuideKbdLetterUsed" or "KeyGuideKbdLetterFree"
-      local hi_hl                 = hi_map and "KeyGuideKbdLetterUsed" or "KeyGuideKbdLetterFree"
+      local br_hl = any_map and "KeyGuideKbdBracketUsed" or "KeyGuideKbdBracketFree"
+      local lo_hl = tiers[key]     or (lo_map and "KeyGuideKbdLetterCold" or "KeyGuideKbdLetterUnused")
+      local hi_hl = tiers[shifted] or (hi_map and "KeyGuideKbdLetterCold" or "KeyGuideKbdLetterUnused")
 
       local cs                    = #line
       highlights[#highlights + 1] = { line = line_0, cs = cs, ce = cs + 1, group = br_hl }
@@ -239,7 +306,7 @@ local function build_kbd_lines(children)
       highlights[#highlights + 1] = { line = line_0, cs = cs + 2, ce = cs + 3, group = hi_hl }
       highlights[#highlights + 1] = { line = line_0, cs = cs + 3, ce = cs + 4, group = br_hl }
 
-      line                        = line .. "[" .. key .. shifted .. "]"
+      line = line .. "[" .. key .. shifted .. "]"
     end
     lines[#lines + 1] = line
   end
@@ -330,6 +397,22 @@ local function fill_popup(popup, lines, highlights)
   vim.bo[buf].modifiable = false
 end
 
+--- Append a hint footer line to an already-filled list popup.
+local function append_hint_footer(popup, hint, width)
+  if not hint then return end
+  local buf = popup.bufnr
+  if not buf or not vim.api.nvim_buf_is_valid(buf) then return end
+  local hl  = hint.kind == "hardtime" and "KeyGuideHintHardtime" or "KeyGuideHintFreq"
+  local prefix_str = hint.kind == "hardtime" and "  hint: " or "  "
+  local text = prefix_str .. hint.text
+  if width and #text > width then text = text:sub(1, width - 1) .. "…" end
+  vim.bo[buf].modifiable = true
+  local last = vim.api.nvim_buf_line_count(buf)
+  vim.api.nvim_buf_set_lines(buf, last, last, false, { text })
+  vim.api.nvim_buf_add_highlight(buf, KBD_NS, hl, last, 0, -1)
+  vim.bo[buf].modifiable = false
+end
+
 local function shift_kbd_hl(raw, offset)
   local out = {}
   for _, hl in ipairs(raw) do
@@ -382,15 +465,16 @@ local function close_panels()
   panels.list1  = nil; panels.kbd = nil; panels.list2 = nil
 end
 
-local function open_panels(children, prefix)
+local function open_panels(children, prefix, vim_mode)
   close_panels()
 
   local cols                = vim.o.columns
   local max_h               = math.max(1, vim.o.lines - vim.o.cmdheight - 2)
   local mode                = layout_mode(cols)
 
+  local scores              = key_stats.get(vim_mode or "n", prefix)
   local left_ch, right_ch   = bucket(children)
-  local kbd_raw, kbd_hl_raw = build_kbd_lines(children)
+  local kbd_raw, kbd_hl_raw = build_kbd_lines(children, scores)
 
   local function kbd_panel_lines(h)
     local top_pad = math.max(0, math.floor((h - KBD_HEIGHT) / 2))
@@ -401,6 +485,8 @@ local function open_panels(children, prefix)
     return ls, shift_kbd_hl(kbd_hl_raw, top_pad)
   end
 
+  local hint   = key_hints.get(vim_mode or "n", prefix)
+  -- height = list rows + 1 (prefix header) + 1 (hint footer)
   local height, box
   local lp, kp, rp
 
@@ -409,7 +495,7 @@ local function open_panels(children, prefix)
     local rw = cols - KBD_WIDTH - lw
     height = math.min(math.max(compute_list_rows(left_ch, lw),
       compute_list_rows(right_ch, rw),
-      KBD_HEIGHT) + 1, max_h)
+      KBD_HEIGHT) + 2, max_h)
     local row = compute_row(height)
     lp = make_popup(); kp = make_popup(); rp = make_popup()
     box = Layout.Box({
@@ -426,13 +512,14 @@ local function open_panels(children, prefix)
     panels.height = height; panels.row = row; panels.mode = mode
     panels.list1 = lp; panels.kbd = kp; panels.list2 = rp
     panels.layout:mount()
-    fill_popup(lp, render_list_lines(left_ch, lw, height, prefix))
+    fill_popup(lp, render_list_lines(left_ch, lw, height - 1, prefix))
+    append_hint_footer(lp, hint, lw)
     fill_popup(rp, render_list_lines(right_ch, rw, height, prefix))
     local kl, kh = kbd_panel_lines(height); fill_popup(kp, kl, kh)
   elseif mode == "narrow" then
     local lw       = cols - KBD_WIDTH
     local combined = vim.list_extend(vim.list_extend({}, left_ch), right_ch)
-    height         = math.min(math.max(compute_list_rows(combined, lw), KBD_HEIGHT) + 1, max_h)
+    height         = math.min(math.max(compute_list_rows(combined, lw), KBD_HEIGHT) + 2, max_h)
     local row      = compute_row(height)
     lp             = make_popup(); kp = make_popup()
     box            = Layout.Box({
@@ -448,11 +535,12 @@ local function open_panels(children, prefix)
     panels.height  = height; panels.row = row; panels.mode = mode
     panels.list1   = lp; panels.kbd = kp; panels.list2 = nil
     panels.layout:mount()
-    fill_popup(lp, render_list_lines(combined, lw, height, prefix))
+    fill_popup(lp, render_list_lines(combined, lw, height - 1, prefix))
+    append_hint_footer(lp, hint, lw)
     local kl, kh = kbd_panel_lines(height); fill_popup(kp, kl, kh)
   else -- minimal
     local combined = vim.list_extend(vim.list_extend({}, left_ch), right_ch)
-    height = math.min(compute_list_rows(combined, cols) + 1, max_h)
+    height = math.min(compute_list_rows(combined, cols) + 2, max_h)
     local row = compute_row(height)
     lp = make_popup()
     box = Layout.Box(lp, {})
@@ -465,18 +553,20 @@ local function open_panels(children, prefix)
     panels.height = height; panels.row = row; panels.mode = mode
     panels.list1 = lp; panels.kbd = nil; panels.list2 = nil
     panels.layout:mount()
-    fill_popup(lp, render_list_lines(combined, cols, height, prefix))
+    fill_popup(lp, render_list_lines(combined, cols, height - 1, prefix))
+    append_hint_footer(lp, hint, cols)
   end
 end
 
 --- Fast path: reuse mounted popups, refill buffers, and reflow position/size if needed.
-local function refresh_panels(children, prefix)
+local function refresh_panels(children, prefix, vim_mode)
   local cols                = vim.o.columns
   local max_h               = math.max(1, vim.o.lines - vim.o.cmdheight - 2)
   local mode                = panels.mode
 
+  local scores              = key_stats.get(vim_mode or "n", prefix)
   local left_ch, right_ch   = bucket(children)
-  local kbd_raw, kbd_hl_raw = build_kbd_lines(children)
+  local kbd_raw, kbd_hl_raw = build_kbd_lines(children, scores)
 
   local function kbd_panel_lines(h)
     local top_pad = math.max(0, math.floor((h - KBD_HEIGHT) / 2))
@@ -499,28 +589,33 @@ local function refresh_panels(children, prefix)
     end
   end
 
+  local hint = key_hints.get(vim_mode or "n", prefix)
+
   if mode == "wide" then
     local lw = math.floor((cols - KBD_WIDTH) / 2)
     local rw = cols - KBD_WIDTH - lw
     local h  = math.min(math.max(compute_list_rows(left_ch, lw),
       compute_list_rows(right_ch, rw),
-      KBD_HEIGHT) + 1, max_h)
+      KBD_HEIGHT) + 2, max_h)
     reflow(h)
-    fill_popup(panels.list1, render_list_lines(left_ch, lw, h, prefix))
+    fill_popup(panels.list1, render_list_lines(left_ch, lw, h - 1, prefix))
+    append_hint_footer(panels.list1, hint, lw)
     fill_popup(panels.list2, render_list_lines(right_ch, rw, h, prefix))
     local kl, kh = kbd_panel_lines(h); fill_popup(panels.kbd, kl, kh)
   elseif mode == "narrow" then
     local lw       = cols - KBD_WIDTH
     local combined = vim.list_extend(vim.list_extend({}, left_ch), right_ch)
-    local h        = math.min(math.max(compute_list_rows(combined, lw), KBD_HEIGHT) + 1, max_h)
+    local h        = math.min(math.max(compute_list_rows(combined, lw), KBD_HEIGHT) + 2, max_h)
     reflow(h)
-    fill_popup(panels.list1, render_list_lines(combined, lw, h, prefix))
+    fill_popup(panels.list1, render_list_lines(combined, lw, h - 1, prefix))
+    append_hint_footer(panels.list1, hint, lw)
     local kl, kh = kbd_panel_lines(h); fill_popup(panels.kbd, kl, kh)
   else
     local combined = vim.list_extend(vim.list_extend({}, left_ch), right_ch)
-    local h = math.min(compute_list_rows(combined, cols) + 1, max_h)
+    local h = math.min(compute_list_rows(combined, cols) + 2, max_h)
     reflow(h)
-    fill_popup(panels.list1, render_list_lines(combined, cols, h, prefix))
+    fill_popup(panels.list1, render_list_lines(combined, cols, h - 1, prefix))
+    append_hint_footer(panels.list1, hint, cols)
   end
 end
 
@@ -541,6 +636,11 @@ function M.start(mode, initial_prefix)
   -- Cancel any stale resume autocmd from a prior invocation.
   clear_pending_resume()
 
+  -- While inside the guide we consume keys via getcharstr; pause the on_key
+  -- collector so those aren't double-counted (the guide calls note_press
+  -- explicitly with the right prefix).
+  key_stats.set_paused(true)
+
   local norm_prefix = initial_prefix
   -- Raw bytes typed inside the loop. Does NOT include bytes for initial_prefix
   -- (those were already consumed by whatever keymap triggered M.start).
@@ -550,9 +650,9 @@ function M.start(mode, initial_prefix)
 
   local ch = get_children(mode, norm_prefix)
   if panels.layout and layout_mode(vim.o.columns) == panels.mode then
-    refresh_panels(ch, norm_prefix)
+    refresh_panels(ch, norm_prefix, mode)
   else
-    open_panels(ch, norm_prefix)
+    open_panels(ch, norm_prefix, mode)
   end
   vim.cmd("redraw!")
 
@@ -563,10 +663,12 @@ function M.start(mode, initial_prefix)
     if not ok or char == "\27" then
       close_panels()
       vim.cmd("redraw!")
+      key_stats.set_paused(false)
       return
     end
 
     local norm_char = normalize_key(char)
+    key_stats.note_press(mode, norm_prefix, norm_char)
     local candidate = norm_prefix .. norm_char
     local next_ch   = get_children(mode, candidate)
 
@@ -575,9 +677,9 @@ function M.start(mode, initial_prefix)
       norm_prefix = candidate
       raw_bytes   = raw_bytes .. char
       if layout_mode(vim.o.columns) ~= panels.mode or not panels.layout then
-        open_panels(next_ch, norm_prefix)
+        open_panels(next_ch, norm_prefix, mode)
       else
-        refresh_panels(next_ch, norm_prefix)
+        refresh_panels(next_ch, norm_prefix, mode)
       end
       vim.cmd("redraw!")
     else
@@ -600,6 +702,9 @@ function M.start(mode, initial_prefix)
       })
 
       -- Resume the input loop once neovim is idle back in normal mode.
+      -- Keep the stats collector paused all the way through — if we unpause
+      -- here, a key the user types before the scheduled M.start runs would
+      -- get counted by both on_key and the new note_press call.
       vim.api.nvim_create_autocmd("SafeState", {
         group = RESUME_AUGROUP,
         callback = function()
