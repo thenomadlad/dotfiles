@@ -18,6 +18,7 @@ return {
       "MunifTanjim/nui.nvim",
       { "3rd/image.nvim", cond = function() return #vim.api.nvim_list_uis() > 0 end },
     },
+    lazy = false,
     keys = {
       { "<leader>e", "<Cmd>Neotree toggle last position=left<CR>", desc = "Toggle neotree explorer" },
     },
