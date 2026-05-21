@@ -17,6 +17,7 @@ return {
       "nvim-tree/nvim-web-devicons",
       "MunifTanjim/nui.nvim",
       { "3rd/image.nvim", cond = function() return #vim.api.nvim_list_uis() > 0 end },
+      "saifulapm/neotree-file-nesting-config",
     },
     lazy = false,
     keys = {
@@ -41,8 +42,10 @@ return {
       filesystem = {
         filtered_items = {
           visible = true,
-          hide_dotfiles = false,
-          hide_gitignored = false,
+          show_hidden_count = true,
+          never_show = {
+            '.DS_Store',
+          }
         },
         follow_current_file = { enabled = true },
         group_empty_dirs = true,
@@ -67,6 +70,18 @@ return {
         -- opening Neotree
         position = "float"
       }
+    },
+  },
+  {
+    {
+      "antosha417/nvim-lsp-file-operations",
+      dependencies = {
+        "nvim-lua/plenary.nvim",
+        "nvim-neo-tree/neo-tree.nvim",
+      },
+      config = function()
+        require("lsp-file-operations").setup()
+      end,
     },
   },
 
