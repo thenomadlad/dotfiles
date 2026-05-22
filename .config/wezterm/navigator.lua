@@ -34,10 +34,9 @@ wezterm.on('ActivatePaneDirection-down', function(window, pane)
 end)
 
 return function(config)
-  config.keys = {
-    { key = 'h', mods = 'CTRL', action = act.EmitEvent('ActivatePaneDirection-left') },
-    { key = 'j', mods = 'CTRL', action = act.EmitEvent('ActivatePaneDirection-down') },
-    { key = 'k', mods = 'CTRL', action = act.EmitEvent('ActivatePaneDirection-up') },
-    { key = 'l', mods = 'CTRL', action = act.EmitEvent('ActivatePaneDirection-right') },
-  }
+  config.keys = config.keys or {}
+  table.insert(config.keys, { key = 'h', mods = 'CTRL', action = act.EmitEvent('ActivatePaneDirection-left') })
+  table.insert(config.keys, { key = 'j', mods = 'CTRL', action = act.EmitEvent('ActivatePaneDirection-down') })
+  table.insert(config.keys, { key = 'k', mods = 'CTRL', action = act.EmitEvent('ActivatePaneDirection-up') })
+  table.insert(config.keys, { key = 'l', mods = 'CTRL', action = act.EmitEvent('ActivatePaneDirection-right') })
 end
