@@ -85,6 +85,13 @@ alias ls='ls --color'
 alias du=dust
 alias superbench='wezterm ssh aditya@$(tailscale ip --6 superbench)'
 
+# Inside WezTerm: nvim left, Cursor CLI agent top-right, shell bottom-right ($PWD).
+wproj() {
+  local orig="$WEZTERM_PANE"
+  wezterm cli split-pane --left --percent 58 --cwd "$PWD" -- nvim "$PWD"
+  wezterm cli split-pane --pane-id "$orig" --top --percent 50 --cwd "$PWD" -- agent
+}
+
 if [ -x "$(command -v pyenv)" ]; then
   eval "$(pyenv init -)"
   eval "$(pyenv virtualenv-init -)"
