@@ -53,7 +53,9 @@
       "Bash(open:*)",
       "WebSearch",
       "WebFetch",
-      "mcp__chrome-devtools__*"
+      "mcp__chrome-devtools__*",
+      "Write(~/.claude/**)",
+      "Edit(~/.claude/**)"
     ],
     "deny": [
       "Bash(git push:*)",

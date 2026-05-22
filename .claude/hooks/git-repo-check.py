@@ -48,8 +48,12 @@ def paths_to_check(data: dict) -> list[str]:
     return []
 
 
+ALLOWED_PREFIXES = (os.path.expanduser("~/.claude/"),)
+
 data = json.load(sys.stdin)
 for path in paths_to_check(data):
+    if any(os.path.abspath(path).startswith(p) for p in ALLOWED_PREFIXES):
+        continue
     if not is_in_git_repo(path):
         print(f"Blocked: '{path}' is not inside a git repository.", file=sys.stderr)
         sys.exit(2)
