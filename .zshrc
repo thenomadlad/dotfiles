@@ -89,7 +89,11 @@ alias superbench='wezterm ssh aditya@$(tailscale ip --6 superbench)'
 wproj() {
   local orig="$WEZTERM_PANE"
   wezterm cli split-pane --left --percent 58 --cwd "$PWD" -- nvim "$PWD"
-  wezterm cli split-pane --pane-id "$orig" --top --percent 50 --cwd "$PWD" -- agent
+  if [[ -x "$(command -v claude)" ]]; then
+    wezterm cli split-pane --pane-id "$orig" --top --percent 50 --cwd "$PWD" -- claude
+  elif [[ -x "$(command -v agent)" ]]; then
+    wezterm cli split-pane --pane-id "$orig" --top --percent 50 --cwd "$PWD" -- agent
+  fi
 }
 
 if [ -x "$(command -v pyenv)" ]; then
