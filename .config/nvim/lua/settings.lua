@@ -16,6 +16,13 @@ vim.opt.fillchars = { eob = " " }
 vim.keymap.set("i", "jk", "<ESC>", { silent = true })
 vim.keymap.set("n", "<leader>c", ":bd<CR>", { silent = true })
 vim.keymap.set("n", "<leader>?", function() require("key_guide").start("n") end, { desc = "Key guide" })
+vim.keymap.set("n", "<leader>dn", vim.diagnostic.jump, { desc = "Diagnostics go to next issue" })
+vim.keymap.set(
+  "n",
+  "<leader>dp",
+  function() vim.diagnostic.jump { count = -1 } end,
+  { desc = "Diagnostics go to previous issue" }
+)
 
 -- numbering
 vim.opt.cursorline = true

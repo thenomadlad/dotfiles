@@ -66,13 +66,6 @@ return {
       vim.keymap.set("v", "<leader>la", vim.lsp.buf.code_action, { desc = "LSP code action" })
       vim.keymap.set("n", "<leader>lr", vim.lsp.buf.rename, { desc = "LSP rename symbol" })
       vim.keymap.set("n", "<leader>lgd", vim.lsp.buf.definition, { desc = "LSP go to definition" })
-      vim.keymap.set("n", "<leader>ldn", vim.diagnostic.jump, { desc = "LSP go to next issue" })
-      vim.keymap.set(
-        "n",
-        "<leader>ldp",
-        function() vim.diagnostic.jump { count = -1 } end,
-        { desc = "LSP go to previous issue" }
-      )
 
       vim.lsp.inlay_hint.enable()
     end,
