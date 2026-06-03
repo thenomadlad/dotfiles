@@ -23,6 +23,12 @@ vim.keymap.set(
   function() vim.diagnostic.jump { count = -1 } end,
   { desc = "Diagnostics go to previous issue" }
 )
+vim.keymap.set("n", "<leader>ay", function() require("agent_context").yank_line() end, {
+  desc = "Yank agent context (line)",
+})
+vim.keymap.set("v", "<leader>ay", function() require("agent_context").yank_range() end, {
+  desc = "Yank agent context (range)",
+})
 
 -- numbering
 vim.opt.cursorline = true
