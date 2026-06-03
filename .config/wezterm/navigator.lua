@@ -39,5 +39,7 @@ return function(config)
     { key = 'j', mods = 'CTRL', action = act.EmitEvent('ActivatePaneDirection-down') },
     { key = 'k', mods = 'CTRL', action = act.EmitEvent('ActivatePaneDirection-up') },
     { key = 'l', mods = 'CTRL', action = act.EmitEvent('ActivatePaneDirection-right') },
+    { key = 'Enter', mods = 'CMD',       action = act.SendString '\x1b[13;9~' },
+    { key = 'Enter', mods = 'CMD|SHIFT', action = act.SendString '\x1b[13;10~' },
   }
 end

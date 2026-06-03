@@ -122,6 +122,28 @@ bindkey -M vicmd j history-search-forward
 bindkey -M vicmd k history-search-backward
 KEYTIMEOUT=10
 
+_wezterm_spawn_tab() {
+  [[ -z "$BUFFER" ]] && return
+  local cmd="$BUFFER"
+  BUFFER=""
+  zle reset-prompt
+  wezterm cli spawn --cwd "$PWD" -- zsh -ic "$cmd; exec zsh -i" &>/dev/null &!
+}
+zle -N _wezterm_spawn_tab
+bindkey -M viins $'\e[13;9~' _wezterm_spawn_tab
+bindkey -M vicmd $'\e[13;9~' _wezterm_spawn_tab
+
+_wezterm_new_window() {
+  [[ -z "$BUFFER" ]] && return
+  local cmd="$BUFFER"
+  BUFFER=""
+  zle reset-prompt
+  wezterm start --cwd "$PWD" -- zsh -ic "$cmd; exec zsh -i" &>/dev/null &!
+}
+zle -N _wezterm_new_window
+bindkey -M viins $'\e[13;10~' _wezterm_new_window
+bindkey -M vicmd $'\e[13;10~' _wezterm_new_window
+
 # Longer history
 HISTSIZE=5000
 HISTFILE=~/.zsh_history
