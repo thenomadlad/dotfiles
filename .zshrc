@@ -85,15 +85,22 @@ alias ls='ls --color'
 alias du=dust
 alias superbench='wezterm ssh aditya@$(tailscale ip --6 superbench)'
 
-# Inside WezTerm: nvim left, Cursor CLI agent top-right, shell bottom-right ($PWD).
-wproj() {
-  local orig="$WEZTERM_PANE"
+wopen_nvim() {
   wezterm cli split-pane --left --percent 58 --cwd "$PWD" -- nvim "$PWD"
+}
+
+wopen_claude() {
   if [[ -x "$(command -v claude)" ]]; then
-    wezterm cli split-pane --pane-id "$orig" --top --percent 50 --cwd "$PWD" -- claude
+    wezterm cli split-pane --pane-id "$WEZTERM_PANE" --top --percent 50 --cwd "$PWD" -- claude
   elif [[ -x "$(command -v agent)" ]]; then
-    wezterm cli split-pane --pane-id "$orig" --top --percent 50 --cwd "$PWD" -- agent
+    wezterm cli split-pane --pane-id "$WEZTERM_PANE" --top --percent 50 --cwd "$PWD" -- agent
   fi
+}
+
+# Inside WezTerm: nvim left, claude/agent top-right, shell bottom-right ($PWD).
+wproj() {
+  wopen_nvim
+  wopen_claude
 }
 
 if [ -x "$(command -v pyenv)" ]; then

@@ -1,5 +1,11 @@
--- This will hold the configuration.
--- and finally, return the configuration to wezterm
+local wezterm = require('wezterm')
+
+wezterm.on('open-uri', function(window, pane, uri)
+  if uri:sub(1, 7) == 'mailto:' then
+    return false
+  end
+end)
+
 return function(config)
   config.font_size = 13
   config.color_scheme = "Tokyo Night"
