@@ -6,7 +6,6 @@ return {
       "williamboman/mason.nvim",
       { "williamboman/mason-lspconfig.nvim", event = { "BufReadPre", "BufNewFile" } },
       "mfussenegger/nvim-jdtls",
-      "mrcjkb/rustaceanvim",
       "folke/lazydev.nvim",
     },
     config = function()
@@ -30,9 +29,9 @@ return {
           -- Groovy Gradle DSL (build.gradle, settings.gradle)
           "gradle_ls",
         },
-        automatic_enable = {
-          exclude = { "rust_analyzer" },
-        },
+        -- automatic_enable = {
+        --   exclude = { "rust_analyzer" },
+        -- },
       }
 
       -- Merge after mason-lspconfig baselines (cmd from Mason, etc.); see nvim-lspconfig lsp/*.lua
@@ -53,6 +52,7 @@ return {
       vim.lsp.enable "tailwindcss"
       vim.lsp.enable "eslint"
       vim.lsp.enable "just"
+      vim.lsp.enable "rust_analyzer"
 
       vim.lsp.config("pylsp", {
         settings = {
@@ -116,7 +116,7 @@ return {
     "saghen/blink.cmp",
     opts = function(_, opts)
       opts.sources = opts.sources or {}
-      opts.sources.default = vim.list_extend(opts.sources.default or {}, { "lazydev" })
+      opts.sources.default = vim.list_extend(opts.sources.default or { "lsp", "path", "snippets", "buffer" }, { "lazydev" })
       opts.sources.providers = vim.tbl_deep_extend("force", opts.sources.providers or {}, {
         lazydev = {
           name = "LazyDev",
@@ -126,4 +126,22 @@ return {
       })
     end,
   },
+
+  -- -- rust
+  -- {
+  --   "mrcjkb/rustaceanvim",
+  --   dependencies = { "mfussenegger/nvim-dap" },
+  --   lazy = false, -- mrcjkb feels confident he has lazy loading correctly set setup
+  --   init = function()
+  --     vim.g.rustaceanvim = {
+  --       server = {
+  --         settings = {
+  --           ["rust-analyzer"] = {
+  --             check = { command = "clippy" },
+  --           },
+  --         },
+  --       },
+  --     }
+  --   end,
+  -- },
 }

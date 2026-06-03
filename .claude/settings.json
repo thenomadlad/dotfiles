@@ -57,12 +57,9 @@
       "Write(~/.claude/**)",
       "Edit(~/.claude/**)"
     ],
-    "deny": [
-      "Bash(git push:*)",
-      "Bash(git commit:*)"
-    ],
     "defaultMode": "acceptEdits"
   },
+  "model": "sonnet",
   "hooks": {
     "PreToolUse": [
       {
@@ -71,6 +68,15 @@
           {
             "type": "command",
             "command": "~/.claude/hooks/git-repo-check.py"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/git-branch-check.py"
           }
         ]
       }
@@ -87,6 +93,7 @@
   "alwaysThinkingEnabled": true,
   "effortLevel": "high",
   "skipDangerousModePermissionPrompt": true,
+  "theme": "dark-daltonized",
   "voiceEnabled": true,
-  "theme": "dark-daltonized"
+  "skipAutoPermissionPrompt": true
 }

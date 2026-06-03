@@ -82,24 +82,4 @@ return {
       vim.lsp.config("jdtls", opts)
     end,
   },
-
-  -- rust
-  {
-    "mrcjkb/rustaceanvim",
-    version = "^5",
-    ft = "rust",
-    dependencies = { "mfussenegger/nvim-dap" },
-    lazy = false, -- mrcjkb feels confident he has lazy loading correctly set setup
-    init = function()
-      vim.g.rustaceanvim = {
-        server = {
-          settings = {
-            ["rust-analyzer"] = {
-              check = { command = "clippy" },
-            },
-          },
-        },
-      }
-    end,
-  },
 }
