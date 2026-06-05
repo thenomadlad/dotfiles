@@ -14,7 +14,20 @@ vim.opt.fillchars = { eob = " " }
 
 -- keymaps
 vim.keymap.set("i", "jk", "<ESC>", { silent = true })
-vim.keymap.set("n", "<leader>c", ":bd<CR>", { silent = true })
+local function smart_close_buffer()
+  local cur = vim.api.nvim_get_current_buf()
+  local listed = vim.fn.getbufinfo({ buflisted = 1 })
+  local real = vim.tbl_filter(function(b)
+    return vim.bo[b.bufnr].filetype ~= "neo-tree"
+  end, listed)
+  if #real <= 1 then
+    vim.cmd("enew")
+    vim.cmd("bd " .. cur)
+  else
+    vim.cmd("bd")
+  end
+end
+vim.keymap.set("n", "<leader>c", smart_close_buffer, { silent = true, desc = "Close buffer" })
 vim.keymap.set("n", "<leader>?", function() require("key_guide").start("n") end, { desc = "Key guide" })
 vim.keymap.set("n", "<leader>dn", vim.diagnostic.jump, { desc = "Diagnostics go to next issue" })
 vim.keymap.set(

@@ -26,7 +26,7 @@ return {
     ---@module 'neo-tree'
     ---@type neotree.Config
     opts = {
-      close_if_last_window = true,
+      close_if_last_window = false,
       enable_diagnostics = true,
       -- document_symbols must be listed here; source_selector alone does not load the source
       -- (defaults.lua keeps document_symbols commented out of `sources`).
