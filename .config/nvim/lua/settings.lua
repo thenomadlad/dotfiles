@@ -23,11 +23,26 @@ vim.keymap.set(
   function() vim.diagnostic.jump { count = -1 } end,
   { desc = "Diagnostics go to previous issue" }
 )
-vim.keymap.set("n", "<leader>ay", function() require("agent_context").yank_line() end, {
+vim.api.nvim_create_user_command("AgentYankRange", function(args)
+  require("agent_context").yank_range(args.line1, args.line2)
+end, { range = true })
+vim.api.nvim_create_user_command("AgentYankGithub", function(args)
+  require("agent_context").yank_github_range(args.line1, args.line2)
+end, { range = true })
+
+vim.keymap.set("n", "<leader>ya", function() require("agent_context").yank_line() end, {
   desc = "Yank agent context (line)",
 })
-vim.keymap.set("v", "<leader>ay", function() require("agent_context").yank_range() end, {
+vim.keymap.set("v", "<leader>ya", ":'<,'>AgentYankRange<CR>", {
+  silent = true,
   desc = "Yank agent context (range)",
+})
+vim.keymap.set("n", "<leader>yg", function() require("agent_context").yank_github_line() end, {
+  desc = "Yank GitHub URL (line)",
+})
+vim.keymap.set("v", "<leader>yg", ":'<,'>AgentYankGithub<CR>", {
+  silent = true,
+  desc = "Yank GitHub URL (range)",
 })
 
 -- numbering
