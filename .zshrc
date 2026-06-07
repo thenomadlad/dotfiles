@@ -86,15 +86,19 @@ alias du=dust
 alias superbench='wezterm ssh aditya@$(tailscale ip --6 superbench)'
 
 wopen_nvim() {
-  wezterm cli split-pane --left --percent 58 --cwd "$PWD" -- nvim "$PWD"
+  wezterm cli split-pane --left --percent 58 --cwd "$PWD" -- zsh -c 'while true; do nvim .; echo "nvim exited, restarting in 2s... (Ctrl-C to stop)"; sleep 2; done'
 }
 
 wopen_claude() {
+  local subcmd
   if [[ -x "$(command -v claude)" ]]; then
-    wezterm cli split-pane --pane-id "$WEZTERM_PANE" --top --percent 50 --cwd "$PWD" -- claude
+    subcmd="claude"
   elif [[ -x "$(command -v agent)" ]]; then
-    wezterm cli split-pane --pane-id "$WEZTERM_PANE" --top --percent 50 --cwd "$PWD" -- agent
+    subcmd="agent"
+  else
+    return
   fi
+  wezterm cli split-pane --pane-id "$WEZTERM_PANE" --top --percent 50 --cwd "$PWD" -- zsh -c "while true; do ${subcmd}; echo '${subcmd} exited, restarting in 2s... (Ctrl-C to stop)'; sleep 2; done"
 }
 
 # Inside WezTerm: nvim left, claude/agent top-right, shell bottom-right ($PWD).
