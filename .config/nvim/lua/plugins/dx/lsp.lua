@@ -94,6 +94,7 @@ return {
         css = { "prettier" },
         html = { "prettier" },
         json = { "prettier" },
+        markdown = { "prettier" },
       },
       format_on_save = {
         timeout_ms = 500,

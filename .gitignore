@@ -101,3 +101,6 @@ Temporary Items
 
 # .config included by default
 !.config
+
+# Machine-local secrets — never commit
+.zshrc.local

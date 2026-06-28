@@ -172,3 +172,6 @@ if [[ -x $(which starship) ]]; then
   export STARSHIP_LOG=error
   eval "$(starship init zsh)"
 fi
+
+# Machine-local secrets (not tracked in git)
+[[ -f ~/.zshrc.local ]] && source ~/.zshrc.local
