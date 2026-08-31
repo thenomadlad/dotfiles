@@ -1,0 +1,26 @@
+model_list:
+  - model_name: local-gpt-oss
+    litellm_params:
+      model: ollama/gpt-oss:20b-32k
+      api_base: http://localhost:11434
+
+  - model_name: claude-medium
+    litellm_params:
+      model: claude-haiku-4-5-20251001
+      api_key: os.environ/LITELLM_ANTHROPIC_API_KEY
+
+  - model_name: claude-complex
+    litellm_params:
+      model: claude-sonnet-4-6
+      api_key: os.environ/LITELLM_ANTHROPIC_API_KEY
+
+  - model_name: auto
+    litellm_params:
+      model: auto_router/complexity_router
+      complexity_router_config:
+        tiers:
+          SIMPLE: local-gpt-oss
+          MEDIUM: claude-medium
+          COMPLEX: claude-complex
+          REASONING: claude-complex
+      complexity_router_default_model: local-gpt-oss

@@ -1,0 +1,11 @@
+[Unit]
+Description=LiteLLM proxy
+After=network.target
+
+[Service]
+ExecStartPre=%h/.config/litellm/check-env.sh
+ExecStart=%h/.local/bin/litellm --config %h/.config/litellm/config.yaml --port 4000
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

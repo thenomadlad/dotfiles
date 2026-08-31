@@ -41,6 +41,11 @@ if [[ -f "/opt/homebrew/bin/brew" ]] then
   export PATH="/opt/homebrew/opt/python/libexec/bin:$PATH"
 fi
 
+# lib cusparselt
+if [[ -d "/opt/cusparselt/lib" ]] then
+  export LD_LIBRARY_PATH="/opt/cusparselt/lib:$LD_LIBRARY_PATH"
+fi
+
 [ -x "$(command -v fzf)" ] && eval "$(fzf --zsh)"
 [ -x "$(command -v zoxide)" ] && [[ $- == *i* ]] && eval "$(zoxide init --cmd cd zsh)"
 
@@ -172,6 +177,9 @@ if [[ -x $(which starship) ]]; then
   export STARSHIP_LOG=error
   eval "$(starship init zsh)"
 fi
+
+# opencode
+export PATH=/home/aditya/.opencode/bin:$PATH
 
 # Machine-local secrets (not tracked in git)
 [[ -f ~/.zshrc.local ]] && source ~/.zshrc.local

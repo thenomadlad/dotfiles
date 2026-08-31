@@ -1,0 +1,11 @@
+[Unit]
+Description=Claude Code Remote Control
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/zsh -ilc 'exec claude remote-control'
+WorkingDirectory=/home/aditya/github.com
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
