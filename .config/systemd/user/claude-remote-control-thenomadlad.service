@@ -1,0 +1,11 @@
+[Unit]
+Description=Claude Code Remote Control (thenomadlad)
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/zsh -ilc 'exec claude remote-control --name thenomadlad'
+WorkingDirectory=/home/aditya/github.com/thenomadlad
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

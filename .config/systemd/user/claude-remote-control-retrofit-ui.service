@@ -1,0 +1,11 @@
+[Unit]
+Description=Claude Code Remote Control (retrofit-ui)
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/zsh -ilc 'exec claude remote-control --name retrofit-ui'
+WorkingDirectory=/home/aditya/github.com/retrofit-ui
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

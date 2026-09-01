@@ -3,7 +3,7 @@ Description=Claude Code Remote Control
 After=network.target
 
 [Service]
-ExecStart=/usr/bin/zsh -ilc 'exec claude remote-control'
+ExecStart=/usr/bin/zsh -ilc 'exec claude remote-control --name github.com'
 WorkingDirectory=/home/aditya/github.com
 Restart=on-failure
 
