@@ -16,6 +16,7 @@ return {
         "java",
         "kotlin",
         "groovy",
+        "beancount",
       },
       auto_install = true,
       highlight = {

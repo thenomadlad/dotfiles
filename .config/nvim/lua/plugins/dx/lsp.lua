@@ -54,10 +54,55 @@ return {
       vim.lsp.enable "just"
       vim.lsp.enable "rust_analyzer"
 
+      -- Mason installs pylsp into its own isolated venv, so by default jedi
+      -- (completion/type inference) only sees packages installed there, not
+      -- whatever the project actually depends on. Ask the project's own
+      -- package manager where its venv/interpreter lives, based on whichever
+      -- lockfile is present, and point jedi at that instead.
+      local function detect_venv_python(root_dir)
+        local function run(cmd)
+          local result = vim.system(cmd, { cwd = root_dir, text = true }):wait()
+          if result.code == 0 then
+            return vim.trim(result.stdout or "")
+          end
+        end
+
+        if vim.fn.filereadable(root_dir .. "/poetry.lock") == 1 then
+          local path = run { "poetry", "env", "info", "--executable" }
+          if path and vim.fn.executable(path) == 1 then
+            return path
+          end
+        elseif vim.fn.filereadable(root_dir .. "/uv.lock") == 1 then
+          local path = run { "uv", "run", "--", "python", "-c", "import sys; print(sys.executable)" }
+          if path and vim.fn.executable(path) == 1 then
+            return path
+          end
+          -- fall back to uv's default in-project venv location
+          local fallback = root_dir .. "/.venv/bin/python"
+          if vim.fn.executable(fallback) == 1 then
+            return fallback
+          end
+        end
+      end
+
       vim.lsp.config("pylsp", {
+        before_init = function(_, config)
+          -- Mutate settings in place: `client.settings` is captured by
+          -- reference before before_init runs, so reassigning
+          -- `config.settings` here (e.g. via tbl_deep_extend) would silently
+          -- be dropped -- the client would keep notifying the server with
+          -- the stale table.
+          local venv_python = detect_venv_python(config.root_dir)
+          if venv_python then
+            config.settings.pylsp.plugins.jedi.environment = venv_python
+          end
+        end,
         settings = {
           pylsp = {
-            plugins = { rope_autoimport = { enabled = true } },
+            plugins = {
+              rope_autoimport = { enabled = true },
+              jedi = vim.empty_dict(),
+            },
           },
         },
       })

@@ -10,8 +10,6 @@
       "Bash(rustc:*)",
       "Bash(rustfmt:*)",
       "Bash(clippy:*)",
-      "Bash(python:*)",
-      "Bash(python3:*)",
       "Bash(pip:*)",
       "Bash(pip3:*)",
       "Bash(uv:*)",
@@ -22,7 +20,6 @@
       "Bash(java:*)",
       "Bash(javac:*)",
       "Bash(npm:*)",
-      "Bash(npx:*)",
       "Bash(docker:*)",
       "Bash(docker-compose:*)",
       "Bash(brew:*)",
@@ -36,7 +33,6 @@
       "Bash(cp:*)",
       "Bash(mv:*)",
       "Bash(touch:*)",
-      "Bash(chmod:*)",
       "Bash(pwd:*)",
       "Bash(which:*)",
       "Bash(whoami:*)",
@@ -54,8 +50,8 @@
       "WebSearch",
       "WebFetch",
       "mcp__chrome-devtools__*",
-      "Write(~/.claude/**)",
-      "Edit(~/.claude/**)"
+      "Edit(~/.claude/**)",
+      "mcp__pencil"
     ],
     "defaultMode": "auto"
   },
@@ -83,7 +79,6 @@
     "superpowers@claude-plugins-official": true,
     "skill-creator@claude-plugins-official": true,
     "code-simplifier@claude-plugins-official": true,
-    "github@claude-plugins-official": true,
     "playwright@claude-plugins-official": true,
     "claude-md-management@claude-plugins-official": true,
     "feature-dev@claude-plugins-official": true,
@@ -92,9 +87,20 @@
     "claude-code-setup@claude-plugins-official": true,
     "commit-commands@claude-plugins-official": true,
     "explanatory-output-style@claude-plugins-official": true,
-    "playground@claude-plugins-official": true
+    "playground@claude-plugins-official": true,
+    "ponytail@ponytail": true,
+    "mattpocock-skills@claude-plugins-official": true
+  },
+  "extraKnownMarketplaces": {
+    "ponytail": {
+      "source": {
+        "source": "github",
+        "repo": "DietrichGebert/ponytail"
+      }
+    }
   },
   "alwaysThinkingEnabled": true,
+  "effortLevel": "medium",
   "tui": "fullscreen",
   "skipDangerousModePermissionPrompt": true,
   "theme": "dark-daltonized",
