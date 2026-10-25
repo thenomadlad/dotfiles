@@ -1,0 +1,8 @@
+#!/bin/sh
+# Runs inside the image. uid 1000 matches the host user, so files shared over virtiofs
+# (which keeps host uids) are owned by tester.
+# The home dir is created at boot by tmpfiles (mkosi.extra/etc/tmpfiles.d/tester.conf):
+# rootless mkosi builds can't chown to uid 1000.
+set -e
+useradd --uid 1000 --no-create-home --home-dir /home/tester --shell /usr/bin/zsh --groups wheel tester
+passwd --delete tester

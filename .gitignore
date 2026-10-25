@@ -104,3 +104,9 @@ Temporary Items
 
 # Machine-local secrets — never commit
 .zshrc.local
+
+# Test VM build outputs (vm/)
+vm/mkosi.output/
+vm/mkosi.cache/
+vm/mkosi.tools/
+__pycache__/

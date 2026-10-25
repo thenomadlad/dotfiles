@@ -1,0 +1,16 @@
+[Unit]
+Description=Stow the shared dotfiles into tester's home
+Requires=mnt-dotfiles.mount
+After=mnt-dotfiles.mount
+Before=getty@tty1.service
+
+[Service]
+Type=oneshot
+User=tester
+WorkingDirectory=/mnt/dotfiles
+# --no-folding: link files, not directories, so ~/.config etc. stay writable
+# (a folded ~/.config would point into the read-only share).
+ExecStart=/usr/bin/stow --no-folding --target=/home/tester .
+
+[Install]
+WantedBy=multi-user.target

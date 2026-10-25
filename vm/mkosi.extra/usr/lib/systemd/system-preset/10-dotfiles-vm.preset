@@ -1,0 +1,2 @@
+# mkosi runs `systemctl preset-all` at build time, which would drop plain .wants/ symlinks.
+enable dotfiles-stow.service

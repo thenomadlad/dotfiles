@@ -1,0 +1,2 @@
+# Repo shared from the host by vm/run.sh (virtiofsd --readonly).
+dotfiles  /mnt/dotfiles  virtiofs  ro,nofail  0 0

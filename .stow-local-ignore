@@ -1,0 +1,28 @@
+# This file REPLACES stow's built-in ignore list, so the defaults are restated below.
+# Defaults copied from GNU Stow 2.4.1 (Stow.pm __DATA__).
+
+RCS
+.+,v
+
+CVS
+\.\#.+       # CVS conflict files / emacs lock files
+\.cvsignore
+
+\.svn
+_darcs
+\.hg
+
+\.git
+\.gitignore
+\.gitmodules
+
+.+~          # emacs backup files
+\#.*\#       # emacs autosave files
+
+^/README.*
+^/LICENSE.*
+^/COPYING
+
+# Repo-only tooling, not dotfiles
+^/vm
+^/justfile
