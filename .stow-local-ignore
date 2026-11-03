@@ -26,3 +26,6 @@ _darcs
 # Repo-only tooling, not dotfiles
 ^/vm
 ^/justfile
+
+# Finder metadata
+\.DS_Store
