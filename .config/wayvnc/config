@@ -1,0 +1,4 @@
+# Log in with your Linux user and password (PAM), over RSA-AES. Needs a client that speaks it,
+# like TigerVNC; macOS Screen Sharing doesn't. The address comes from wayvnc.service.
+enable_auth=true
+enable_pam=true

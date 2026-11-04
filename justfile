@@ -99,3 +99,14 @@ _vm-not-running:
 # Delete the built image and mkosi's caches
 vm-clean:
     mkosi -C vm -ff clean
+
+# Replace GDM with headless Hyprland on tty1 at next boot (see README); needs sudo
+headless-on:
+    sudo install -Dm644 system/hyprland-headless.service /etc/systemd/system/hyprland-headless.service
+    sudo systemctl disable gdm
+    sudo systemctl enable hyprland-headless
+
+# Undo headless-on: GDM again at next boot
+headless-off:
+    sudo systemctl disable hyprland-headless
+    sudo systemctl enable gdm

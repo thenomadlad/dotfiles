@@ -45,6 +45,10 @@ hl.on("hyprland.start", function ()
   hl.exec_cmd("mako")
   hl.exec_cmd("hypridle")
   hl.exec_cmd("systemctl --user start hyprpolkitagent")
+  -- Remote desktop over Tailscale (.config/systemd/user/wayvnc.service). With no monitor plugged in,
+  -- add a virtual one for wayvnc to show.
+  -- shortcut: checked once at start, so hotplugging a monitor later won't add/remove it; re-login to redo
+  hl.exec_cmd("grep -qx connected /sys/class/drm/card*-*/status || hyprctl output create headless REMOTE; systemctl --user start wayvnc")
 end)
 
 

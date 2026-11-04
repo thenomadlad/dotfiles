@@ -1,0 +1,30 @@
+# Boots straight into Hyprland on tty1, no display manager and no login, for remote use over
+# wayvnc. Replaces GDM (both alias display-manager.service). Installed by `just headless-on`.
+# The PAM session gives Hyprland seat0 and the GPU; a plain user unit has no seat and crashes.
+[Unit]
+Description=Headless Hyprland on tty1
+After=systemd-user-sessions.service dbus.socket systemd-logind.service getty@tty1.service
+Wants=dbus.socket systemd-logind.service
+Conflicts=getty@tty1.service
+
+[Service]
+User=aditya
+PAMName=login
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+StandardInput=tty-fail
+StandardError=journal
+UtmpIdentifier=tty1
+UtmpMode=user
+Environment=XDG_SESSION_TYPE=wayland
+# Start locked, so a plugged-in monitor doesn't show an open desktop
+ExecStart=/usr/bin/start-hyprland -- --locked-cmd hyprlock
+# Exiting Hyprland (SUPER+M) gives a fresh session instead of a dead box
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=graphical.target
+Alias=display-manager.service

@@ -1,0 +1,16 @@
+[Unit]
+Description=wayvnc remote desktop for Hyprland (Tailscale IP only)
+PartOf=graphical-session.target
+After=graphical-session.target
+ConditionEnvironment=WAYLAND_DISPLAY
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+# No [Install]: it needs a running Hyprland, which starts it (see hyprland.lua).
+[Service]
+# Fails (and retries) until Tailscale has an IP, so it never falls back to another address
+ExecStart=/bin/sh -c 'ip=$(tailscale ip -4) && exec wayvnc "$ip"'
+Restart=on-failure
+RestartSec=2
+RestartSteps=5
+RestartMaxDelaySec=60
