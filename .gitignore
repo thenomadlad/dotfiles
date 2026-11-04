@@ -105,6 +105,10 @@ Temporary Items
 # Machine-local secrets — never commit
 .zshrc.local
 
+# Caches and runtime data written through stowed symlinks
+.claude/skills/synced/
+.local/share/litellm/
+
 # Test VM build outputs (vm/)
 vm/mkosi.output/
 vm/mkosi.cache/
