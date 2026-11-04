@@ -89,7 +89,8 @@
     "explanatory-output-style@claude-plugins-official": true,
     "playground@claude-plugins-official": true,
     "ponytail@ponytail": true,
-    "mattpocock-skills@claude-plugins-official": true
+    "mattpocock-skills@claude-plugins-official": true,
+    "cc-plugin-you-should-know@builtin": true
   },
   "extraKnownMarketplaces": {
     "ponytail": {
