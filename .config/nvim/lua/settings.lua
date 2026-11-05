@@ -3,6 +3,26 @@ vim.g.maplocalleader = "\\"
 
 vim.opt.updatetime = 300
 vim.opt.clipboard = "unnamedplus"
+
+-- Over ssh there is no system clipboard, so copy through the terminal (OSC 52; tmux passes it on).
+-- WezTerm does not answer OSC 52 reads, so paste returns the last copy; Cmd+V pastes from the Mac.
+if vim.env.SSH_TTY then
+  local osc52 = require("vim.ui.clipboard.osc52")
+  local last = { {}, "v" }
+  local function copy(reg)
+    local send = osc52.copy(reg)
+    return function(lines, regtype)
+      last = { lines, regtype }
+      send(lines)
+    end
+  end
+  local function paste() return last end
+  vim.g.clipboard = {
+    name = "OSC 52",
+    copy = { ["+"] = copy("+"), ["*"] = copy("*") },
+    paste = { ["+"] = paste, ["*"] = paste },
+  }
+end
 vim.opt.termguicolors = true
 
 -- spacing
