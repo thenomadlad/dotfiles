@@ -98,8 +98,25 @@ alias du=dust
 # -u: a non-login ssh command has no LANG there, and tmux would draw non-ASCII as '_'
 alias superbench='ssh -t aditya@superbench.taildc84ad.ts.net tmux -u new-session -A -s main'
 
+# Split this pane in tmux when inside tmux (superbench over ssh), else in WezTerm.
+# Usage: _split_pane left|right|top|bottom <percent or ''> [command...]
+_split_pane() {
+  local dir=$1 size=$2
+  shift 2
+  local -a opts=()
+  if [[ -n $TMUX ]]; then
+    local -A flag=(left -hb right -h top -vb bottom -v)
+    [[ -n $size ]] && opts=(-l "$size%")
+    tmux split-window $flag[$dir] $opts -t "$TMUX_PANE" -c "$PWD" "$@"
+  else
+    [[ -n $size ]] && opts=(--percent "$size")
+    (( $# )) && set -- -- "$@"
+    wezterm cli split-pane --pane-id "$WEZTERM_PANE" --$dir $opts --cwd "$PWD" "$@"
+  fi
+}
+
 wopen_nvim() {
-  wezterm cli split-pane --left --percent 58 --cwd "$PWD" -- zsh -c 'while true; do nvim .; echo "nvim exited, restarting in 2s... (Ctrl-C to stop)"; sleep 2; done'
+  _split_pane left 58 zsh -c 'while true; do nvim .; echo "nvim exited, restarting in 2s... (Ctrl-C to stop)"; sleep 2; done'
 }
 
 wopen_claude() {
@@ -111,10 +128,10 @@ wopen_claude() {
   else
     return
   fi
-  wezterm cli split-pane --pane-id "$WEZTERM_PANE" --top --percent 50 --cwd "$PWD" -- zsh -c "while true; do ${subcmd}; echo '${subcmd} exited, restarting in 2s... (Ctrl-C to stop)'; sleep 2; done"
+  _split_pane top 50 zsh -c "while true; do ${subcmd}; echo '${subcmd} exited, restarting in 2s... (Ctrl-C to stop)'; sleep 2; done"
 }
 
-# Inside WezTerm: nvim left, claude/agent top-right, shell bottom-right ($PWD).
+# Inside WezTerm or tmux: nvim left, claude/agent top-right, shell bottom-right ($PWD).
 wproj() {
   wopen_nvim
   wopen_claude
@@ -151,20 +168,12 @@ _spawn_line() {
   [[ -n "$BUFFER" ]] && run=(zsh -ic "$BUFFER; exec zsh -i")
   BUFFER=""
   zle reset-prompt
-  if [[ -n $TMUX ]]; then
-    case $where in
-      split-right) tmux split-window -h -c "$PWD" "${run[@]}" ;;
-      split-down) tmux split-window -v -c "$PWD" "${run[@]}" ;;
-    esac
-  else
-    (( $#run )) && run=(-- "${run[@]}")
-    case $where in
-      tab) wezterm cli spawn --cwd "$PWD" "${run[@]}" ;;
-      window) wezterm start --cwd "$PWD" "${run[@]}" ;;
-      split-right) wezterm cli split-pane --pane-id "$WEZTERM_PANE" --right --cwd "$PWD" "${run[@]}" ;;
-      split-down) wezterm cli split-pane --pane-id "$WEZTERM_PANE" --bottom --cwd "$PWD" "${run[@]}" ;;
-    esac
-  fi &>/dev/null &!
+  # tab and window always have a command here: an empty line returned above
+  case $where in
+    split-*) _split_pane ${where#split-} '' "${run[@]}" ;;
+    tab) wezterm cli spawn --cwd "$PWD" -- "${run[@]}" ;;
+    window) wezterm start --cwd "$PWD" -- "${run[@]}" ;;
+  esac &>/dev/null &!
 }
 
 _wezterm_spawn_tab() { _spawn_line tab }
@@ -191,7 +200,7 @@ zle -N _wezterm_split_right
 bindkey -M viins $'\e[37;7~' _wezterm_split_right
 bindkey -M vicmd $'\e[37;7~' _wezterm_split_right
 
-_wezterm_split_down() { _spawn_line split-down }
+_wezterm_split_down() { _spawn_line split-bottom }
 zle -N _wezterm_split_down
 bindkey -M viins $'\e[34;7~' _wezterm_split_down
 bindkey -M vicmd $'\e[34;7~' _wezterm_split_down
