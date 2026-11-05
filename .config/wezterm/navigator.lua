@@ -1,15 +1,24 @@
 local wezterm = require('wezterm')
 local act = wezterm.action
 
-local function isViProcess(pane)
-  -- get_foreground_process_name On Linux, macOS and Windows,
-  -- the process can be queried to determine this path. Other operating systems
-  -- (notably, FreeBSD and other unix systems) are not currently supported
-  return pane:get_foreground_process_name():find('n?vim') ~= nil or pane:get_title():find("n?vim") ~= nil
+-- get_foreground_process_name On Linux, macOS and Windows,
+-- the process can be queried to determine this path. Other operating systems
+-- (notably, FreeBSD and other unix systems) are not currently supported
+local function foregroundProcess(pane)
+  return pane:get_foreground_process_name() or ''
+end
+
+local function runsSsh(pane)
+  return foregroundProcess(pane):find('/ssh$') ~= nil
+end
+
+-- nvim handles the keys itself, and so does tmux at the far end of an ssh session
+local function paneTakesNavKeys(pane)
+  return foregroundProcess(pane):find('n?vim') ~= nil or runsSsh(pane) or pane:get_title():find("n?vim") ~= nil
 end
 
 local function conditionalActivatePane(window, pane, pane_direction, vim_direction)
-  if isViProcess(pane) then
+  if paneTakesNavKeys(pane) then
     window:perform_action(
     -- This should match the keybinds you set in Neovim.
       act.SendKey({ key = vim_direction, mods = 'CTRL' }),
@@ -33,14 +42,20 @@ wezterm.on('ActivatePaneDirection-down', function(window, pane)
   conditionalActivatePane(window, pane, 'Down', 'j')
 end)
 
--- At an idle zsh prompt (user var set in .zshrc), let zsh split and run the typed line
-wezterm.on('SplitRight', function(window, pane)
-  if pane:get_user_vars().at_prompt == '1' then
-    window:perform_action(act.SendString '\x1b[37;7~', pane)
-  else
-    window:perform_action(act.SplitHorizontal { domain = 'CurrentPaneDomain' }, pane)
+-- At an idle zsh prompt (user var set in .zshrc), let zsh split and run the typed line.
+-- Over ssh, tmux on the far end makes that call instead (see tmux.conf).
+local function splitWithTypedLine(sequence, split)
+  return function(window, pane)
+    if pane:get_user_vars().at_prompt == '1' or runsSsh(pane) then
+      window:perform_action(act.SendString(sequence), pane)
+    else
+      window:perform_action(split { domain = 'CurrentPaneDomain' }, pane)
+    end
   end
-end)
+end
+
+wezterm.on('SplitRight', splitWithTypedLine('\x1b[37;7~', act.SplitHorizontal))
+wezterm.on('SplitDown', splitWithTypedLine('\x1b[34;7~', act.SplitVertical))
 
 return function(config)
   config.keys = {
@@ -53,5 +68,8 @@ return function(config)
     { key = '%',     mods = 'CTRL|ALT',       action = act.EmitEvent('SplitRight') },
     { key = '%',     mods = 'CTRL|SHIFT|ALT', action = act.EmitEvent('SplitRight') },
     { key = '5',     mods = 'CTRL|SHIFT|ALT', action = act.EmitEvent('SplitRight') },
+    { key = '"',     mods = 'CTRL|ALT',       action = act.EmitEvent('SplitDown') },
+    { key = '"',     mods = 'CTRL|SHIFT|ALT', action = act.EmitEvent('SplitDown') },
+    { key = "'",     mods = 'CTRL|SHIFT|ALT', action = act.EmitEvent('SplitDown') },
   }
 end

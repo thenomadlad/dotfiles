@@ -94,7 +94,9 @@ fi
 # alias ohmyzsh="mate ~/.oh-my-zsh"
 alias ls='ls --color'
 alias du=dust
-alias superbench='wezterm connect superbench'
+# MagicDNS name: the bare 'superbench' resolves to the LAN first
+# -u: a non-login ssh command has no LANG there, and tmux would draw non-ASCII as '_'
+alias superbench='ssh -t aditya@superbench.taildc84ad.ts.net tmux -u new-session -A -s main'
 
 wopen_nvim() {
   wezterm cli split-pane --left --percent 58 --cwd "$PWD" -- zsh -c 'while true; do nvim .; echo "nvim exited, restarting in 2s... (Ctrl-C to stop)"; sleep 2; done'
@@ -138,29 +140,44 @@ bindkey -M vicmd j history-search-forward
 bindkey -M vicmd k history-search-backward
 KEYTIMEOUT=10
 
-_wezterm_spawn_tab() {
-  [[ -z "$BUFFER" ]] && return
-  local cmd="$BUFFER"
+# Run the typed line in a new tab, window or split; an empty line only splits, into a plain shell.
+# Inside tmux (superbench over ssh) only the splits work, since tmux has no tabs or OS windows.
+_spawn_line() {
+  local where=$1
+  [[ -z "$BUFFER" && $where != split-* ]] && return
+  [[ -n $TMUX && $where != split-* ]] && return
+  [[ -n $TMUX || -n $WEZTERM_PANE ]] || return  # nothing to spawn into; keep the line
+  local -a run=()
+  [[ -n "$BUFFER" ]] && run=(zsh -ic "$BUFFER; exec zsh -i")
   BUFFER=""
   zle reset-prompt
-  wezterm cli spawn --cwd "$PWD" -- zsh -ic "$cmd; exec zsh -i" &>/dev/null &!
+  if [[ -n $TMUX ]]; then
+    case $where in
+      split-right) tmux split-window -h -c "$PWD" "${run[@]}" ;;
+      split-down) tmux split-window -v -c "$PWD" "${run[@]}" ;;
+    esac
+  else
+    (( $#run )) && run=(-- "${run[@]}")
+    case $where in
+      tab) wezterm cli spawn --cwd "$PWD" "${run[@]}" ;;
+      window) wezterm start --cwd "$PWD" "${run[@]}" ;;
+      split-right) wezterm cli split-pane --pane-id "$WEZTERM_PANE" --right --cwd "$PWD" "${run[@]}" ;;
+      split-down) wezterm cli split-pane --pane-id "$WEZTERM_PANE" --bottom --cwd "$PWD" "${run[@]}" ;;
+    esac
+  fi &>/dev/null &!
 }
+
+_wezterm_spawn_tab() { _spawn_line tab }
 zle -N _wezterm_spawn_tab
 bindkey -M viins $'\e[13;9~' _wezterm_spawn_tab
 bindkey -M vicmd $'\e[13;9~' _wezterm_spawn_tab
 
-_wezterm_new_window() {
-  [[ -z "$BUFFER" ]] && return
-  local cmd="$BUFFER"
-  BUFFER=""
-  zle reset-prompt
-  wezterm start --cwd "$PWD" -- zsh -ic "$cmd; exec zsh -i" &>/dev/null &!
-}
+_wezterm_new_window() { _spawn_line window }
 zle -N _wezterm_new_window
 bindkey -M viins $'\e[13;10~' _wezterm_new_window
 bindkey -M vicmd $'\e[13;10~' _wezterm_new_window
 
-# Tell WezTerm when the prompt is idle, so Ctrl+Alt+% can hand the split to zsh
+# Tell WezTerm when the prompt is idle, so Ctrl+Alt+% and Ctrl+Alt+" can hand the split to zsh
 if [[ -n $WEZTERM_PANE ]]; then
   _wezterm_at_prompt() { printf '\e]1337;SetUserVar=at_prompt=MQ==\a' }  # base64 of "1"
   _wezterm_busy() { printf '\e]1337;SetUserVar=at_prompt=\a' }
@@ -169,16 +186,15 @@ if [[ -n $WEZTERM_PANE ]]; then
   add-zsh-hook preexec _wezterm_busy
 fi
 
-_wezterm_split() {
-  local -a run=()
-  [[ -n "$BUFFER" ]] && run=(-- zsh -ic "$BUFFER; exec zsh -i")
-  BUFFER=""
-  zle reset-prompt
-  wezterm cli split-pane --pane-id "$WEZTERM_PANE" --right --cwd "$PWD" "${run[@]}" &>/dev/null &!
-}
-zle -N _wezterm_split
-bindkey -M viins $'\e[37;7~' _wezterm_split
-bindkey -M vicmd $'\e[37;7~' _wezterm_split
+_wezterm_split_right() { _spawn_line split-right }
+zle -N _wezterm_split_right
+bindkey -M viins $'\e[37;7~' _wezterm_split_right
+bindkey -M vicmd $'\e[37;7~' _wezterm_split_right
+
+_wezterm_split_down() { _spawn_line split-down }
+zle -N _wezterm_split_down
+bindkey -M viins $'\e[34;7~' _wezterm_split_down
+bindkey -M vicmd $'\e[34;7~' _wezterm_split_down
 
 # Longer history
 HISTSIZE=5000
