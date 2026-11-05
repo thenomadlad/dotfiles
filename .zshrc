@@ -88,7 +88,7 @@ fi
 # alias ohmyzsh="mate ~/.oh-my-zsh"
 alias ls='ls --color'
 alias du=dust
-alias superbench='wezterm ssh aditya@$(tailscale ip --6 superbench)'
+alias superbench='wezterm connect superbench'
 
 wopen_nvim() {
   wezterm cli split-pane --left --percent 58 --cwd "$PWD" -- zsh -c 'while true; do nvim .; echo "nvim exited, restarting in 2s... (Ctrl-C to stop)"; sleep 2; done'
@@ -152,6 +152,26 @@ _wezterm_new_window() {
 zle -N _wezterm_new_window
 bindkey -M viins $'\e[13;10~' _wezterm_new_window
 bindkey -M vicmd $'\e[13;10~' _wezterm_new_window
+
+# Tell WezTerm when the prompt is idle, so Ctrl+Alt+% can hand the split to zsh
+if [[ -n $WEZTERM_PANE ]]; then
+  _wezterm_at_prompt() { printf '\e]1337;SetUserVar=at_prompt=MQ==\a' }  # base64 of "1"
+  _wezterm_busy() { printf '\e]1337;SetUserVar=at_prompt=\a' }
+  autoload -Uz add-zsh-hook
+  add-zsh-hook precmd _wezterm_at_prompt
+  add-zsh-hook preexec _wezterm_busy
+fi
+
+_wezterm_split() {
+  local -a run=()
+  [[ -n "$BUFFER" ]] && run=(-- zsh -ic "$BUFFER; exec zsh -i")
+  BUFFER=""
+  zle reset-prompt
+  wezterm cli split-pane --pane-id "$WEZTERM_PANE" --right --cwd "$PWD" "${run[@]}" &>/dev/null &!
+}
+zle -N _wezterm_split
+bindkey -M viins $'\e[37;7~' _wezterm_split
+bindkey -M vicmd $'\e[37;7~' _wezterm_split
 
 # Longer history
 HISTSIZE=5000

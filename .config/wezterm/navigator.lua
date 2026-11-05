@@ -33,6 +33,15 @@ wezterm.on('ActivatePaneDirection-down', function(window, pane)
   conditionalActivatePane(window, pane, 'Down', 'j')
 end)
 
+-- At an idle zsh prompt (user var set in .zshrc), let zsh split and run the typed line
+wezterm.on('SplitRight', function(window, pane)
+  if pane:get_user_vars().at_prompt == '1' then
+    window:perform_action(act.SendString '\x1b[37;7~', pane)
+  else
+    window:perform_action(act.SplitHorizontal { domain = 'CurrentPaneDomain' }, pane)
+  end
+end)
+
 return function(config)
   config.keys = {
     { key = 'h',     mods = 'CTRL',      action = act.EmitEvent('ActivatePaneDirection-left') },
@@ -41,5 +50,8 @@ return function(config)
     { key = 'l',     mods = 'CTRL',      action = act.EmitEvent('ActivatePaneDirection-right') },
     { key = 'Enter', mods = 'CMD',       action = act.SendString '\x1b[13;9~' },
     { key = 'Enter', mods = 'CMD|SHIFT', action = act.SendString '\x1b[13;10~' },
+    { key = '%',     mods = 'CTRL|ALT',       action = act.EmitEvent('SplitRight') },
+    { key = '%',     mods = 'CTRL|SHIFT|ALT', action = act.EmitEvent('SplitRight') },
+    { key = '5',     mods = 'CTRL|SHIFT|ALT', action = act.EmitEvent('SplitRight') },
   }
 end
