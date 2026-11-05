@@ -69,7 +69,13 @@ fi
 export NVM_DIR="$HOME/.nvm"
 if [[ -s "$NVM_DIR/nvm.sh" ]]; then
   unset npm_config_prefix
-  [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+  # --no-use skips resolving the `stable` default alias, which took ~1s per shell
+  \. "$NVM_DIR/nvm.sh" --no-use
+  # ponytail: newest installed node stands in for `stable`; `nvm use` still switches per shell
+  () {
+    local bins=("$NVM_DIR"/versions/node/v*/bin(NnOn[1]))
+    (( $#bins )) && export NVM_BIN=$bins[1] PATH="$bins[1]:$PATH"
+  }
   [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
 fi
 
@@ -113,7 +119,8 @@ wproj() {
 }
 
 if [ -x "$(command -v pyenv)" ]; then
-  eval "$(pyenv init -)"
+  # also puts the shims on PATH; pyenv rehashes after install, so skip it per shell
+  eval "$(pyenv init - --no-rehash zsh)"
   eval "$(pyenv virtualenv-init -)"
 fi
 
